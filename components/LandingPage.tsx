@@ -156,6 +156,7 @@ export default function LandingPage() {
   const [config, setConfig] = useState<Config>(INITIAL_CONFIG);
   const [roster, setRoster] = useState<RosterItem[]>([]);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [hasReviewed, setHasReviewed] = useState(false); // Novo estado para controle do checkbox
   
   const [designFiles, setDesignFiles] = useState<Record<keyof typeof KIT_TYPES, string | null>>({
     linha: null, goleiro: null, comissao: null, atleta: null, torcida: null,
@@ -760,6 +761,7 @@ export default function LandingPage() {
     let currentKitType: keyof typeof KIT_TYPES | null = null;
     
     const requiredFieldsFilled = config.customerInfo.customerName && config.customerInfo.customerPhone;
+    const canSubmit = requiredFieldsFilled && hasReviewed;
 
     return (
       <div className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-500">
@@ -779,7 +781,7 @@ export default function LandingPage() {
                     placeholder="Nome Completo"
                     value={config.customerInfo.customerName}
                     onChange={(e) => handleCustomerInfoChange('customerName', e.target.value)}
-                    className="w-full px-4 py-2 border rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-gray-900 placeholder-gray-400"
                     required
                 />
                 <input 
@@ -787,7 +789,7 @@ export default function LandingPage() {
                     placeholder="Número de Telefone (Ex: 16 99123-4567)"
                     value={config.customerInfo.customerPhone}
                     onChange={(e) => handleCustomerInfoChange('customerPhone', e.target.value)}
-                    className="w-full px-4 py-2 border rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-gray-900 placeholder-gray-400"
                     required
                 />
             </div>
@@ -832,7 +834,7 @@ export default function LandingPage() {
                           <input 
                             type="text" 
                             placeholder="Ex: Ronaldo"
-                            className="w-full bg-transparent border-b border-transparent focus:border-indigo-500 outline-none py-1 placeholder-gray-300"
+                            className="w-full bg-transparent border-b border-transparent focus:border-indigo-500 outline-none py-1 placeholder-gray-400 text-gray-900"
                             value={player.name}
                             onChange={(e) => handleRosterChange(index, 'name', e.target.value)}
                           />
@@ -841,14 +843,14 @@ export default function LandingPage() {
                           <input 
                             type="text" 
                             placeholder={player.kitType === 'comissao' ? 'TÉC' : '10'}
-                            className="w-full bg-transparent border-b border-transparent focus:border-indigo-500 outline-none py-1 text-center placeholder-gray-300"
+                            className="w-full bg-transparent border-b border-transparent focus:border-indigo-500 outline-none py-1 text-center placeholder-gray-400 text-gray-900"
                             value={player.number}
                             onChange={(e) => handleRosterChange(index, 'number', e.target.value)}
                           />
                         </td>
                         <td className="px-4 py-2">
                           <select 
-                            className="w-full bg-transparent border-b border-transparent focus:border-indigo-500 outline-none py-1 text-gray-700"
+                            className="w-full bg-transparent border-b border-transparent focus:border-indigo-500 outline-none py-1 text-gray-900"
                             value={player.size}
                             onChange={(e) => handleRosterChange(index, 'size', e.target.value)}
                           >
@@ -887,17 +889,36 @@ export default function LandingPage() {
                 <span className="text-xs text-gray-500 italic">*O valor final será confirmado após análise da arte.</span>
             </div>
 
+            {/* Aviso de Responsabilidade */}
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3 shadow-sm">
+                <div className="pt-0.5">
+                    <input
+                        type="checkbox"
+                        id="review-confirmation"
+                        checked={hasReviewed}
+                        onChange={(e) => setHasReviewed(e.target.checked)}
+                        className="w-5 h-5 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500 cursor-pointer"
+                    />
+                </div>
+                <label htmlFor="review-confirmation" className="text-sm text-amber-900 cursor-pointer select-none">
+                    <span className="font-bold flex items-center gap-1 mb-1"><AlertTriangle size={14} /> ATENÇÃO - REVISE SEU PEDIDO:</span>
+                    Declaro que revisei todos os nomes, números e tamanhos listados acima.
+                    Estou ciente de que a produção seguirá <strong>exatamente</strong> esta lista e que
+                    <strong> erros de digitação ou escolha de tamanho nesta formalização são de minha inteira responsabilidade</strong>.
+                </label>
+            </div>
+
             {/* Ações */}
-            <div className="pt-4 flex flex-col sm:flex-row gap-3">
+            <div className="pt-2 flex flex-col sm:flex-row gap-3">
                 
                 {/* 1. Download/PDF */}
                 <button 
                     onClick={handleDownload}
-                    disabled={!requiredFieldsFilled}
+                    disabled={!canSubmit}
                     className={`flex-1 px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg text-white ${
-                        requiredFieldsFilled 
+                        canSubmit 
                         ? 'bg-indigo-600 hover:bg-indigo-700 hover:scale-105 shadow-indigo-300/50' 
-                        : 'bg-indigo-400 cursor-not-allowed'
+                        : 'bg-gray-600 cursor-not-allowed opacity-50'
                     }`}
                 >
                     <Download size={20} /> Baixar Orçamento (Arquivo de Texto)
@@ -905,14 +926,14 @@ export default function LandingPage() {
 
                 {/* 2. Enviar WhatsApp */}
                 <a 
-                    href={generateWhatsAppLink()}
+                    href={canSubmit ? generateWhatsAppLink() : '#'}
                     target="_blank" 
                     rel="noopener noreferrer"
-                    onClick={(e) => { if (!requiredFieldsFilled) e.preventDefault(); }}
+                    onClick={(e) => { if (!canSubmit) e.preventDefault(); }}
                     className={`flex-1 px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg ${
-                        requiredFieldsFilled 
+                        canSubmit
                         ? 'bg-[#25D366] hover:bg-[#20bd5a] text-white hover:scale-105 shadow-green-200/50'
-                        : 'bg-gray-500 text-gray-300 cursor-not-allowed'
+                        : 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
                     }`}
                 >
                     <Send size={20} /> Enviar via WhatsApp
@@ -922,6 +943,12 @@ export default function LandingPage() {
             {!requiredFieldsFilled && (
                 <p className="text-red-300 text-sm mt-2 text-center font-medium">
                     Preencha Nome Completo e Telefone para enviar o pedido.
+                </p>
+            )}
+
+            {requiredFieldsFilled && !hasReviewed && (
+                <p className="text-amber-300 text-sm mt-2 text-center font-medium animate-pulse">
+                    Você precisa confirmar a revisão dos dados acima para prosseguir.
                 </p>
             )}
 
