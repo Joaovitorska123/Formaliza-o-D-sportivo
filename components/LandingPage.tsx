@@ -376,75 +376,35 @@ export default function LandingPage() {
 
   // --- Funções de Exportação ---
   const generateOrderText = () => {
-    const total = calculateTotal();
+    // 1. Cabeçalho Mínimo e Dados do Cliente
+    let text = `*PEDIDO D'SPORTIVO*\n`;
+    text += `------------------------------------------------\n`;
+    text += `CLIENTE: ${config.customerInfo.customerName || 'NÃO INFORMADO'}\n`;
+    text += `CONTATO: ${config.customerInfo.customerPhone || 'NÃO INFORMADO'}\n`;
+    text += `LINHA: ${LINE_DETAILS[config.line].name}\n`;
+    text += `------------------------------------------------\n`;
+    text += `*ITENS DO PEDIDO:*\n`;
     
-    // 1. Cabeçalho e Dados do Cliente
-    let text = `
-------------------------------------------------
-         FORMALIZAÇÃO DE PEDIDO D'SPORTIVO
-------------------------------------------------
-*DADOS DO CLIENTE:*
-Nome Completo: ${config.customerInfo.customerName || 'NÃO INFORMADO'}
-Telefone/WhatsApp: ${config.customerInfo.customerPhone || 'NÃO INFORMADO'}
-Data/Hora: ${new Date().toLocaleString('pt-BR')}
-------------------------------------------------
-    
-*1. CONFIGURAÇÃO GERAL E ORÇAMENTO*
-------------------------------------------------
-- Linha de Qualidade: ${LINE_DETAILS[config.line].name}
-- Valor Estimado: R$ ${total.toFixed(2).replace('.', ',')}
-- Total de Peças Principais: ${totalKits} Kits
-(O valor final será confirmado após análise das artes.)
-%0A
-*2. DISTRIBUIÇÃO DE PEÇAS PRINCIPAIS*
-------------------------------------------------
-`;
-    
-    // 2. Detalhe das Quantidades
-    (Object.keys(KIT_TYPES) as Array<keyof typeof KIT_TYPES>).forEach(key => {
-      if (config.kitQuantities[key] > 0) {
-        text += `- ${KIT_TYPES[key]}: ${config.kitQuantities[key]} peças\n`;
-      }
-    });
-
-    // 3. Detalhe dos Meiões
-    text += `
-*3. MEIÕES EXTRAS (${totalSocks} Pares)*
-------------------------------------------------
-`;
-    if (config.socks.length === 0 || totalSocks === 0) {
-      text += '- NENHUM meião extra solicitado.\n';
-    } else {
-      config.socks.forEach(sock => {
-        if (sock.quantity > 0) {
-          text += `- ${sock.color}: ${sock.quantity} pares\n`;
-        }
-      });
-    }
-
-    // 4. Lista de Atletas (Roster)
-    text += `
-*4. LISTA DE PERSONALIZAÇÃO (DETALHADA)*
-------------------------------------------------
-`;
-    let currentKitType: keyof typeof KIT_TYPES | null = null;
-    let groupIndex = 0;
-    
+    // 2. Lista Simplificada: NOME NUMERO TAMANHO CATEGORIA PEÇA
     roster.forEach(p => {
-        if (p.kitType !== currentKitType) {
-            currentKitType = p.kitType;
-            groupIndex = 1;
-            text += `\n- CATEGORIA: ${KIT_TYPES[p.kitType]} -\n`;
-        }
-        text += `${groupIndex}. NOME: ${p.name || '(Vazio)'} | NÚMERO: ${p.number || '(Vazio)'} | TAMANHO: ${p.size} | ITEM: ${p.type.toUpperCase()}\n`;
-        groupIndex++;
+       const categoria = KIT_TYPES[p.kitType];
+       const itemType = p.type === 'conjunto' ? 'CONJUNTO' : p.type === 'camisa' ? 'CAMISA' : 'CALÇÃO';
+       const nome = p.name || '-';
+       const numero = p.number || '-';
+       
+       text += `NOME: ${nome} | NÚMERO: ${numero} | TAMANHO: ${p.size} | CATEGORIA: ${categoria} | PEÇA: ${itemType}\n`;
     });
 
-    text += `
-------------------------------------------------
-*INSTRUÇÃO DE ENVIO:*
-Por favor, envie esta mensagem e ANEXE os prints/artes de cada modelo (Linha, Goleiro, etc.) para darmos seguimento à produção da arte final.
-`;
+    // 3. Meiões (se houver)
+    if (config.socks.some(s => s.quantity > 0)) {
+        text += `------------------------------------------------\n`;
+        text += `*MEIÕES EXTRAS:*\n`;
+        config.socks.forEach(sock => {
+            if (sock.quantity > 0) {
+                text += `COR: ${sock.color} | QTD: ${sock.quantity}\n`;
+            }
+        });
+    }
     
     return text.trim();
   };
