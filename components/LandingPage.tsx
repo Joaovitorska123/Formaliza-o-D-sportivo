@@ -3,23 +3,25 @@ import {
   Upload, 
   CheckCircle2, 
   ArrowRight, 
-  ArrowLeft,
-  Trophy,
-  ExternalLink,
-  Shirt,
-  Footprints,
-  Maximize2,
-  X,
-  Plus,
-  Trash2,
-  Save,
-  Download,
-  AlertTriangle,
-  Briefcase,
-  Gem,
-  Check,
-  Image as ImageIcon,
-  Ruler // Novo ícone importado
+  ArrowLeft, 
+  Trophy, 
+  ExternalLink, 
+  Shirt, 
+  Footprints, 
+  Maximize2, 
+  X, 
+  Plus, 
+  Trash2, 
+  Save, 
+  Download, 
+  AlertTriangle, 
+  Briefcase, 
+  Gem, 
+  Check, 
+  Image as ImageIcon, 
+  Ruler,
+  ChevronDown,
+  Info
 } from 'lucide-react';
 
 import { initializeApp } from 'firebase/app';
@@ -38,6 +40,9 @@ import {
   Firestore 
 } from 'firebase/firestore';
 
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+
 // --- Global Declarations for External Variables ---
 declare const __app_id: string;
 declare const __firebase_config: string;
@@ -51,8 +56,101 @@ const PRICES = {
   empresarial: { camisa: 49.90, calcao: 35.00, conjunto: 84.90, meiao: 20.00 },
 };
 
-// URL DA TABELA DE MEDIDAS (Substitua esta URL pela sua imagem real)
-const SIZE_CHART_URL = "https://placehold.co/600x800/png?text=Tabela+de+Medidas\n(Substitua+pela+sua+imagem)";
+// --- Dados da Tabela de Medidas (Agrupados por Linha) ---
+const SIZE_TABLES = {
+  // Dados baseados na imagem "LINHA BRONZE" (Camisa Preta)
+  // Prata / Ouro / Empresarial
+  standard: {
+    masculina: {
+      title: "Medidas Masculina (Padrão)",
+      headerColor: "bg-blue-600",
+      headers: ["TAMANHO", "LARGURA", "ALTURA"],
+      keys: ["t", "w", "h"],
+      data: [
+        { t: 'ESP', w: '65cm', h: '81,5cm' },
+        { t: 'XG', w: '61cm', h: '75,5cm' },
+        { t: 'GG', w: '58,5cm', h: '75cm' },
+        { t: 'G', w: '56,5cm', h: '73cm' },
+        { t: 'M', w: '52cm', h: '69,5cm' },
+        { t: 'P', w: '48cm', h: '67cm' },
+      ]
+    },
+    feminina: {
+      title: "Medidas Feminina (Baby Look Padrão)",
+      headerColor: "bg-blue-600",
+      headers: ["TAMANHO", "LARGURA", "ALTURA"],
+      keys: ["t", "w", "h"],
+      data: [
+        { t: 'XG', w: '55,5cm', h: '72cm' },
+        { t: 'GG', w: '51cm', h: '66,5cm' },
+        { t: 'G', w: '46,5cm', h: '66cm' },
+        { t: 'M', w: '46cm', h: '62,5cm' },
+        { t: 'P', w: '46cm', h: '60cm' },
+      ]
+    },
+    infantil: {
+      title: "Medidas Infantis (Padrão)",
+      headerColor: "bg-blue-600",
+      headers: ["TAMANHO", "ALTURA", "LARGURA"],
+      keys: ["t", "h", "w"],
+      data: [
+        { t: 'T.12', h: '56cm', w: '46cm' },
+        { t: 'T.10', h: '54cm', w: '44cm' },
+        { t: 'T.8', h: '51cm', w: '42cm' },
+        { t: 'T.6', h: '49cm', w: '40cm' },
+        { t: 'T.4', h: '46cm', w: '38cm' },
+      ]
+    }
+  },
+  // Dados baseados na imagem "ECTION DRY" (Camisa Azul)
+  // Diamante (Slim)
+  diamond: {
+    masculina: {
+      title: "Medidas Masculina (Diamante/Slim)",
+      headerColor: "bg-indigo-900",
+      headers: ["TAMANHO", "ALTURA", "LARGURA"],
+      keys: ["t", "h", "w"],
+      data: [
+        { t: 'G3', h: '89cm', w: '80cm' },
+        { t: 'ESP', h: '84cm', w: '70cm' },
+        { t: 'XG', h: '73cm', w: '60cm' },
+        { t: 'GG', h: '73cm', w: '56cm' },
+        { t: 'G', h: '70cm', w: '53cm' },
+        { t: 'M', h: '70cm', w: '51cm' },
+        { t: 'P', h: '67cm', w: '49cm' },
+      ]
+    },
+    feminina: {
+      title: "Medidas Feminina (Diamante Baby Look)",
+      headerColor: "bg-fuchsia-800",
+      headers: ["TAMANHO", "ALTURA", "LARGURA"],
+      keys: ["t", "h", "w"],
+      data: [
+        { t: 'XG', h: '65cm', w: '58cm' },
+        { t: 'GG', h: '63cm', w: '56cm' },
+        { t: 'G', h: '63cm', w: '53cm' },
+        { t: 'M', h: '61cm', w: '50cm' },
+        { t: 'P', h: '57cm', w: '48cm' },
+      ]
+    },
+    infantil: {
+      title: "Medidas Infantis (Diamante)",
+      headerColor: "bg-indigo-900",
+      headers: ["TAMANHO", "ALTURA", "LARGURA"],
+      keys: ["t", "h", "w"],
+      data: [
+        { t: 'T.16', h: '61cm', w: '50cm' },
+        { t: 'T.14', h: '59cm', w: '48cm' },
+        { t: 'T.12', h: '56cm', w: '46cm' },
+        { t: 'T.10', h: '54cm', w: '44cm' },
+        { t: 'T.8', h: '51cm', w: '42cm' },
+        { t: 'T.6', h: '49cm', w: '40cm' },
+        { t: 'T.4', h: '46cm', w: '38cm' },
+        { t: 'T.2', h: '43cm', w: '36cm' },
+      ]
+    }
+  }
+};
 
 // --- Detalhes Ricos das Linhas (Atualizado com Modelos e Features) ---
 const LINE_DETAILS = {
@@ -133,6 +231,7 @@ const KIT_TYPES: Record<string, string> = {
   comissao: 'Comissão Técnica',
   atleta: 'Atleta', // Uniforme extra
   torcida: 'Torcida',
+  staff: 'Staff / Eventos', // Nova Categoria Adicionada
 };
 
 const SOCK_COLORS = [
@@ -167,24 +266,35 @@ interface CustomerInfo {
     customerPhone: string;
 }
 
+type LineType = 'prata' | 'ouro' | 'diamante' | 'empresarial';
+
 interface Config {
-  line: 'prata' | 'ouro' | 'diamante' | 'empresarial';
+  line: LineType; // Default line selected in step 1
+  kitLines: Record<keyof typeof KIT_TYPES, LineType>; // Specific line per kit type
   kitQuantities: Record<keyof typeof KIT_TYPES, number>;
   socks: SockItem[];
   nextSockId: number;
-  customerInfo: CustomerInfo; // Novo campo
+  customerInfo: CustomerInfo;
 }
 
 // Valores iniciais
 const INITIAL_CONFIG: Config = {
     line: 'prata',
-    kitQuantities: { linha: 10, atleta: 0, goleiro: 0, comissao: 0, torcida: 0 },
+    kitLines: {
+        linha: 'prata',
+        goleiro: 'prata',
+        comissao: 'prata',
+        atleta: 'prata',
+        torcida: 'prata',
+        staff: 'prata', // Default line for staff
+    },
+    kitQuantities: { linha: 10, atleta: 0, goleiro: 0, comissao: 0, torcida: 0, staff: 0 },
     socks: [],
     nextSockId: 1,
     customerInfo: { customerName: '', customerPhone: '' },
 };
 
-// SVG do Logo D'Sportivo
+// SVG do Logo D'Sportivo (Antigo - Mantido por referência, mas não usado no header)
 const DsPortivoLogo = () => (
     <svg 
         width="24" 
@@ -214,6 +324,52 @@ const DsPortivoLogo = () => (
     </svg>
 );
 
+// Novo Componente de Logo da Marca (Apenas Texto)
+const BrandLogo = () => (
+  <div className="flex items-center select-none">
+    {/* Logotipo Texto */}
+    <div className="flex flex-col leading-none">
+        <span className="text-3xl font-black italic tracking-tighter text-black" style={{ transform: 'skewX(-10deg)', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+            D'Sportivo
+        </span>
+        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-black text-right mr-0.5" style={{ transform: 'skewX(-10deg)', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+            Uniformes
+        </span>
+    </div>
+  </div>
+);
+
+// Componente auxiliar para renderizar uma tabela de tamanhos (Agora Dinâmica)
+const SizeTable = ({ title, headerColor, headers, keys, data }: { title: string, headerColor: string, headers: string[], keys: string[], data: any[] }) => (
+    <div className="border border-gray-200 rounded-lg overflow-hidden shadow-sm h-fit">
+      <div className={`${headerColor} text-white font-bold py-2 px-3 text-center uppercase text-sm`}>
+        {title}
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[200px]">
+          <thead className="bg-gray-100 font-bold text-gray-700 text-xs">
+            <tr>
+              {headers.map((header, idx) => (
+                <th key={idx} className="py-2 px-2 border-b border-gray-200 text-center whitespace-nowrap">{header}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {data.map((row, idx) => (
+              <tr key={idx} className={idx % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                {keys.map((key, kIdx) => (
+                  <td key={kIdx} className={`py-2 px-2 text-center border-gray-100 ${kIdx === 0 ? 'font-bold text-gray-900 border-r' : 'text-gray-600'}`}>
+                    {row[key]}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+);
+
 
 export default function LandingPage() {
   // --- Estados Firebase e Autenticação ---
@@ -230,15 +386,16 @@ export default function LandingPage() {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [hasReviewed, setHasReviewed] = useState(false); // Novo estado para controle do checkbox
   const [showSizeChart, setShowSizeChart] = useState(false); // Novo estado para modal de medidas
-  
+  const [activeSizeTab, setActiveSizeTab] = useState<'standard' | 'diamond'>('standard'); // Controle das abas de medida
+
   const [designFiles, setDesignFiles] = useState<Record<keyof typeof KIT_TYPES, string | null>>({
-    linha: null, goleiro: null, comissao: null, atleta: null, torcida: null,
+    linha: null, goleiro: null, comissao: null, atleta: null, torcida: null, staff: null,
   });
 
   // --- Firebase Init e Auth ---
   useEffect(() => {
-    const appId = typeof __app_id !== 'undefined' ? (__app_id as string) : 'default-app-id';
-    const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? (__firebase_config as string) : '{}');
+    const appId = typeof __app_id !== 'undefined' ? String(__app_id as any) : 'default-app-id';
+    const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? String(__firebase_config as any) : '{}');
 
     if (Object.keys(firebaseConfig).length === 0) {
       console.warn("Firebase config is missing. Running in offline mode (some features disabled).");
@@ -256,21 +413,21 @@ export default function LandingPage() {
       const unsubscribe = onAuthStateChanged(newAuth, async (user) => {
         if (user) {
           setUserId(user.uid);
-          loadProgress(newDb, user.uid, appId);
+          loadProgress(newDb, String(user.uid), String(appId));
         } else {
           // Tenta signInWithCustomToken ou Anônimo
           if (typeof __initial_auth_token !== 'undefined') {
-            await signInWithCustomToken(newAuth, (__initial_auth_token as any) as string);
+            await signInWithCustomToken(newAuth, String(__initial_auth_token as any));
           } else {
             const anonUser = await signInAnonymously(newAuth);
             setUserId(anonUser.user.uid);
-            loadProgress(newDb, anonUser.user.uid, appId);
+            loadProgress(newDb, String(anonUser.user.uid), String(appId));
           }
         }
       });
       return () => unsubscribe();
     } catch (e) {
-      console.error("Erro ao inicializar Firebase:", e);
+      console.error("Erro ao inicializar Firebase:", e as any);
       setIsLoading(false);
     }
   }, []);
@@ -282,7 +439,7 @@ export default function LandingPage() {
   }, []);
 
   const saveProgress = async () => {
-    const appId = typeof __app_id !== 'undefined' ? (__app_id as string) : 'default-app-id';
+    const appId = typeof __app_id !== 'undefined' ? String(__app_id as any) : 'default-app-id';
     const docRef = getDocRef(db, userId, appId);
 
     if (!docRef) {
@@ -302,7 +459,7 @@ export default function LandingPage() {
         setSaveStatus('saved');
         setTimeout(() => setSaveStatus('idle'), 3000);
     } catch (e) {
-        console.error("Erro ao salvar progresso:", e);
+        console.error("Erro ao salvar progresso:", e as any);
         setSaveStatus('error');
     }
   };
@@ -318,12 +475,15 @@ export default function LandingPage() {
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
         const data = docSnap.data();
-        if (data.config) setConfig(data.config);
+        if (data.config) {
+            // Merge for backward compatibility if new fields added
+            setConfig(prev => ({...prev, ...data.config, kitLines: data.config.kitLines || prev.kitLines}));
+        }
         if (data.roster) setRoster(data.roster);
         if (data.designFiles) setDesignFiles(data.designFiles);
       }
     } catch (e) {
-      console.warn("Nenhum rascunho encontrado ou erro ao carregar:", e);
+      console.warn("Nenhum rascunho encontrado ou erro ao carregar:", e as any);
     } finally {
       setIsLoading(false);
     }
@@ -343,13 +503,18 @@ export default function LandingPage() {
   const minOrderMet = totalKits >= 10;
   
   const calculateTotal = () => {
-    const prices = PRICES[config.line];
+    // Agora o preço é calculado com base na linha escolhida para cada categoria
+    // Se a linha da categoria não estiver definida (ex: dados antigos), usa a global
     const rosterTotal = roster.reduce((acc, item) => {
       const itemType = item.type as 'camisa' | 'calcao' | 'conjunto';
-      const itemPrice = prices[itemType] || prices.conjunto;
+      const categoryLine = config.kitLines[item.kitType] || config.line; 
+      const categoryPrices = PRICES[categoryLine];
+      const itemPrice = categoryPrices[itemType] || categoryPrices.conjunto;
       return acc + itemPrice;
     }, 0);
-    const socksTotal = totalSocks * prices.meiao;
+    
+    // Meião usa preço da linha global (ou poderíamos definir uma lógica de média, mas usarei a base)
+    const socksTotal = totalSocks * PRICES[config.line].meiao;
     return rosterTotal + socksTotal;
   };
 
@@ -406,7 +571,7 @@ export default function LandingPage() {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => setDesignFiles(prev => ({ ...prev, [kitType]: reader.result as string }));
+      reader.onloadend = () => setDesignFiles(prev => ({ ...prev, [kitType]: String(reader.result) }));
       reader.readAsDataURL(file);
     }
   };
@@ -427,7 +592,7 @@ export default function LandingPage() {
       ...prev,
       socks: prev.socks.map(sock => 
         sock.id === id 
-          ? { ...sock, [field]: field === 'quantity' ? Math.max(0, parseInt(value as string) || 0) : value } 
+          ? { ...sock, [field]: field === 'quantity' ? Math.max(0, parseInt(String(value)) || 0) : value as string } 
           : sock
       ),
     }));
@@ -440,104 +605,254 @@ export default function LandingPage() {
     }));
   };
 
-  // --- Funções de Exportação ---
-  const generateOrderText = () => {
-    let text = `*PEDIDO D'SPORTIVO*\n`;
-    text += `------------------------------------------------\n`;
-    text += `CLIENTE: ${config.customerInfo.customerName || 'NÃO INFORMADO'}\n`;
-    text += `CONTATO: ${config.customerInfo.customerPhone || 'NÃO INFORMADO'}\n`;
-    text += `LINHA: ${LINE_DETAILS[config.line].name}\n`;
-    text += `------------------------------------------------\n`;
-    
-    // --- RESUMO QUANTITATIVO (GRADE) ---
-    text += `*RESUMO DE GRADE (QUANTIDADES)*\n`;
-    
-    const summary: Record<string, Record<string, number>> = {};
-    const catOrder = ['INFANTIL', 'FEMININO (BABY LOOK)', 'ADULTO'];
-    const sizeOrder = [...SIZES_INFANTIL, ...SIZES_FEMININO, ...SIZES_ADULTO];
+  const selectLine = (lineKey: LineType) => {
+      // Sets the default line AND updates all categories to this line
+      const newKitLines = { ...config.kitLines };
+      (Object.keys(newKitLines) as Array<keyof typeof KIT_TYPES>).forEach(k => {
+          newKitLines[k] = lineKey;
+      });
 
-    roster.forEach(item => {
-        let category = 'ADULTO';
-        if (SIZES_INFANTIL.includes(item.size)) category = 'INFANTIL';
-        else if (SIZES_FEMININO.includes(item.size)) category = 'FEMININO (BABY LOOK)';
-        
-        if (!summary[category]) summary[category] = {};
-        if (!summary[category][item.size]) summary[category][item.size] = 0;
-        summary[category][item.size]++;
-    });
-
-    catOrder.forEach(cat => {
-        if (summary[cat]) {
-            text += `\n>>> ${cat}:\n`;
-            Object.entries(summary[cat])
-                .sort((a, b) => sizeOrder.indexOf(a[0]) - sizeOrder.indexOf(b[0]))
-                .forEach(([size, count]) => {
-                    text += `    [ ${size} ]: ${count} unidades\n`;
-                });
-        }
-    });
-
-    text += `\n------------------------------------------------\n`;
-    text += `*DETALHAMENTO AGRUPADO POR TAMANHO:*\n`;
-
-    // --- LISTA DETALHADA AGRUPADA ---
-    catOrder.forEach(cat => {
-        // Filtra itens desta categoria
-        const categoryItems = roster.filter(item => {
-             if (cat === 'INFANTIL') return SIZES_INFANTIL.includes(item.size);
-             if (cat === 'FEMININO (BABY LOOK)') return SIZES_FEMININO.includes(item.size);
-             return SIZES_ADULTO.includes(item.size); // Default to ADULTO
-        });
-
-        if (categoryItems.length > 0) {
-            text += `\n================================\n`;
-            text += ` CATEGORIA: ${cat}\n`;
-            text += `================================\n`;
-            
-            // Agrupa por tamanho, ordenando pelo sizeOrder
-            const uniqueSizes = Array.from(new Set(categoryItems.map(i => i.size)))
-                                     .sort((a, b) => sizeOrder.indexOf(a) - sizeOrder.indexOf(b));
-
-            uniqueSizes.forEach(size => {
-                const itemsInSize = categoryItems.filter(i => i.size === size);
-                text += `\n   ---> TAMANHO: ${size} (Total: ${itemsInSize.length})\n`;
-                
-                itemsInSize.forEach((p, idx) => {
-                    const categoria = KIT_TYPES[p.kitType];
-                    const itemType = p.type === 'conjunto' ? 'CONJUNTO' : p.type === 'camisa' ? 'CAMISA' : 'CALÇÃO';
-                    const nome = p.name || '---';
-                    const numero = p.number || '---';
-                    text += `      ${idx + 1}. NOME: ${nome} | Nº: ${numero} | TIPO: ${categoria} (${itemType})\n`;
-                });
-            });
-        }
-    });
-
-
-    if (config.socks.some(s => s.quantity > 0)) {
-        text += `\n------------------------------------------------\n`;
-        text += `*MEIÕES EXTRAS:*\n`;
-        config.socks.forEach(sock => {
-            if (sock.quantity > 0) {
-                text += `COR: ${sock.color} | QTD: ${sock.quantity}\n`;
-            }
-        });
-    }
-    
-    return text.trim();
+      setConfig({ 
+          ...config, 
+          line: lineKey, 
+          kitLines: newKitLines,
+          socks: config.socks.map(s => ({...s, quantity: 0})) 
+      });
+      setStep(2); // Auto advance when selecting from modal now
   };
 
+  const updateKitLine = (kitType: keyof typeof KIT_TYPES, lineKey: LineType) => {
+      setConfig(prev => ({
+          ...prev,
+          kitLines: {
+              ...prev.kitLines,
+              [kitType]: lineKey
+          }
+      }));
+  };
+
+  // --- Funções de Exportação (PDF) ---
   const handleDownload = () => {
-    const textContent = generateOrderText();
-    const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `PedidoDSportivo_${config.customerInfo.customerName.replace(/ /g, '_') || 'Draft'}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    
+    // --- Header ---
+    doc.setFontSize(22);
+    doc.setTextColor(30, 58, 138); // Indigo 900
+    doc.text("D'Sportivo Uniformes", 14, 20);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`Data: ${new Date().toLocaleDateString('pt-BR')}`, pageWidth - 14, 20, { align: 'right' });
+    
+    doc.setLineWidth(0.5);
+    doc.setDrawColor(200);
+    doc.line(14, 25, pageWidth - 14, 25);
+
+    // --- Customer & Order Info ---
+    doc.setFontSize(12);
+    doc.setTextColor(0);
+    doc.text(`Cliente: ${config.customerInfo.customerName || 'NÃO INFORMADO'}`, 14, 35);
+    doc.text(`Telefone: ${config.customerInfo.customerPhone || 'NÃO INFORMADO'}`, 14, 42);
+    // Removed specific Line info from header as it varies per category now
+    doc.text(`Orçamento Personalizado`, 14, 49);
+
+    let currentY = 55;
+
+    // --- Quantities Summary Table ---
+    const summaryData = Object.entries(config.kitQuantities)
+      .filter(([_, qty]) => (qty as number) > 0)
+      .map(([key, qty]) => {
+          const k = key as keyof typeof KIT_TYPES;
+          const lineName = LINE_DETAILS[config.kitLines[k]].name;
+          return [KIT_TYPES[k], lineName, `${qty} unidades`];
+      });
+
+    if (summaryData.length > 0) {
+      doc.setFontSize(11);
+      doc.setTextColor(30, 58, 138);
+      doc.text("Resumo de Quantidades e Linhas", 14, currentY);
+      
+      autoTable(doc, {
+        startY: currentY + 3,
+        head: [['Categoria', 'Linha Escolhida', 'Quantidade']],
+        body: summaryData,
+        theme: 'striped',
+        headStyles: { fillColor: [30, 58, 138] },
+        styles: { fontSize: 10 }
+      });
+      
+      currentY = ((doc as any).lastAutoTable.finalY as number) + 10;
+    }
+
+    // --- Socks Table ---
+    const activeSocks = config.socks.filter(s => (s.quantity as number) > 0);
+    if (activeSocks.length > 0) {
+      doc.setFontSize(11);
+      doc.setTextColor(30, 58, 138);
+      doc.text("Meiões Avulsos", 14, currentY);
+
+      const socksData = activeSocks.map(s => [s.color, `${s.quantity} pares`]);
+      
+      autoTable(doc, {
+        startY: currentY + 3,
+        head: [['Cor', 'Quantidade']],
+        body: socksData,
+        theme: 'striped',
+        headStyles: { fillColor: [75, 85, 99] }, // Gray 600
+        styles: { fontSize: 10 }
+      });
+
+      currentY = ((doc as any).lastAutoTable.finalY as number) + 10;
+    }
+
+    // --- Roster (Detail) Table ---
+    // SORTING LOGIC: Group by Size (as requested)
+    const sortedRoster = [...roster].sort((a, b) => {
+        const indexA = ALL_SIZES.indexOf(a.size);
+        const indexB = ALL_SIZES.indexOf(b.size);
+        // Fallback for unknown sizes, although unlikely with dropdown
+        if (indexA === -1) return 1;
+        if (indexB === -1) return -1;
+        return indexA - indexB;
+    });
+
+    doc.setFontSize(11);
+    doc.setTextColor(30, 58, 138);
+    doc.text("Grade Completa (Agrupada por Tamanho)", 14, currentY);
+
+    const rosterData = sortedRoster.map((item, index) => {
+        let typeLabel = '';
+        if (item.type === 'conjunto') typeLabel = 'Conjunto Completo';
+        else if (item.type === 'camisa') typeLabel = 'Apenas Camisa';
+        else if (item.type === 'calcao') typeLabel = 'Apenas Calção';
+
+        // Add Line info to the row
+        const lineName = LINE_DETAILS[config.kitLines[item.kitType]].name;
+
+        return [
+            index + 1,
+            `${KIT_TYPES[item.kitType]} (${lineName})`,
+            item.name || '-',
+            item.number || '-',
+            item.size,
+            typeLabel
+        ];
+    });
+
+    autoTable(doc, {
+        startY: currentY + 3,
+        head: [['#', 'Categoria (Linha)', 'Nome', 'Nº', 'Tam.', 'Item']],
+        body: rosterData,
+        theme: 'grid',
+        headStyles: { fillColor: [30, 58, 138] },
+        columnStyles: {
+            0: { cellWidth: 10 },
+            2: { cellWidth: 40, fontStyle: 'bold' },
+            3: { cellWidth: 20, halign: 'center' },
+            4: { cellWidth: 20, halign: 'center', fontStyle: 'bold' },
+        },
+        styles: { fontSize: 9, cellPadding: 3 }
+    });
+
+    // --- Footer & Totals ---
+    const finalY = ((doc as any).lastAutoTable.finalY as number) + 10;
+    
+    // Check if we need a new page for totals
+    if (finalY > (doc.internal.pageSize.getHeight() as number) - 40) {
+        doc.addPage();
+        currentY = 20;
+    } else {
+        currentY = finalY;
+    }
+
+    // Total Box
+    doc.setFillColor(243, 244, 246); // gray-100
+    doc.rect(pageWidth - 80, currentY, 66, 25, 'F');
+    doc.setDrawColor(200);
+    doc.rect(pageWidth - 80, currentY, 66, 25, 'S');
+
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text("Total Estimado", pageWidth - 75, currentY + 8);
+    
+    doc.setFontSize(16);
+    doc.setTextColor(22, 163, 74); // green-600
+    doc.setFont("helvetica", "bold");
+    doc.text(`R$ ${calculateTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, pageWidth - 75, currentY + 18);
+
+    // Disclaimer
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(150);
+    const disclaimer = "* O valor final pode sofrer alterações após análise da arte. Este documento é uma estimativa de orçamento baseada nos dados fornecidos no simulador.";
+    const splitDisclaimer = doc.splitTextToSize(disclaimer, pageWidth - 30);
+    doc.text(splitDisclaimer, 14, currentY + 35);
+
+    // --- ATTACHED DESIGN IMAGES (New Feature) ---
+    const kitKeys = Object.keys(KIT_TYPES) as Array<keyof typeof KIT_TYPES>;
+    
+    kitKeys.forEach((key) => {
+        const imageData = designFiles[key];
+        // Only include if there are items for this category AND an image was uploaded
+        if (imageData && (config.kitQuantities[key] as number) > 0) {
+            doc.addPage();
+            
+            // Header for Image Page
+            doc.setFontSize(16);
+            doc.setTextColor(30, 58, 138); // Indigo 900
+            doc.setFont("helvetica", "bold");
+            doc.text(`Modelo Visual: ${KIT_TYPES[key]}`, 14, 20);
+            
+            doc.setFontSize(10);
+            doc.setTextColor(100);
+            doc.setFont("helvetica", "normal");
+            doc.text(`Linha Selecionada: ${LINE_DETAILS[config.kitLines[key]].name}`, 14, 26);
+            doc.text(`Anexo referente aos itens da categoria ${KIT_TYPES[key]}`, 14, 32);
+            
+            // Image Rendering logic
+            try {
+                // Get page dimensions
+                const pdfWidth = doc.internal.pageSize.getWidth();
+                const pdfHeight = doc.internal.pageSize.getHeight();
+                
+                // Margins
+                const marginX = 14;
+                const marginY = 40;
+                const maxW = pdfWidth - (marginX * 2);
+                const maxH = pdfHeight - marginY - 20; // Bottom margin
+                
+                // We add the image with 'auto' width/height calculation essentially by letting jsPDF handle it 
+                // or we can calculate aspect ratio if needed. 
+                // Simple approach: fit within the box.
+                
+                const imgProps = doc.getImageProperties(imageData);
+                const ratio = imgProps.width / imgProps.height;
+                
+                let finalW = maxW;
+                let finalH = finalW / ratio;
+                
+                if (finalH > maxH) {
+                    finalH = maxH;
+                    finalW = finalH * ratio;
+                }
+                
+                // Centering if narrower than page
+                const xOffset = marginX + (maxW - finalW) / 2;
+                
+                doc.addImage(imageData, 'PNG', xOffset, marginY, finalW, finalH);
+                
+            } catch (err) {
+                console.error("Erro ao adicionar imagem ao PDF", err);
+                doc.setTextColor(255, 0, 0);
+                doc.text("Erro ao renderizar imagem do modelo.", 14, 45);
+            }
+        }
+    });
+
+    // Filename
+    const sanitizedName = config.customerInfo.customerName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    doc.save(`Orcamento_DSportivo_${sanitizedName || 'novo'}.pdf`);
   };
 
 
@@ -626,12 +941,12 @@ export default function LandingPage() {
              </button>
              <button 
                 onClick={() => {
-                    setConfig({ ...config, line: lineKey, socks: config.socks.map(s => ({...s, quantity: 0})) });
+                    selectLine(lineKey);
                     setModalOpen(null);
                 }}
                 className={`px-8 py-3 rounded-xl font-bold text-white shadow-lg transition-transform hover:scale-105 active:scale-95 ${details.color.replace('bg-', 'bg-').replace('-400', '-600').replace('-500', '-600')}`}
              >
-                Selecionar Linha {details.name}
+                Começar com Linha {details.name}
              </button>
           </div>
         </div>
@@ -639,91 +954,143 @@ export default function LandingPage() {
     );
   };
   
-  // Componente de Input de Quantidade (Reutilizável)
-  const QuantityInput = ({ kitType }: { kitType: keyof typeof KIT_TYPES }) => (
-    <div className="bg-indigo-50 rounded-2xl p-4 border border-indigo-100 flex flex-col justify-center">
-        <label className="block text-sm font-bold text-indigo-900 mb-2">{KIT_TYPES[kitType]}</label>
-        <div className="flex items-center gap-4">
-            <button 
-                onClick={() => setConfig(prev => ({ 
-                ...prev, 
-                kitQuantities: { ...prev.kitQuantities, [kitType]: Math.max(0, prev.kitQuantities[kitType] - 1) } 
-                }))}
-                className="w-10 h-10 rounded-lg bg-white text-indigo-600 font-bold border border-indigo-200 hover:bg-indigo-100 text-lg"
-            >-</button>
-            <input 
-                type="number" 
-                min="0"
-                value={config.kitQuantities[kitType]}
-                onChange={(e) => setConfig(prev => ({ 
-                ...prev, 
-                kitQuantities: { ...prev.kitQuantities, [kitType]: Math.max(0, parseInt(e.target.value) || 0) } 
-                }))}
-                className="w-20 text-center text-2xl font-bold bg-transparent border-b-2 border-indigo-300 focus:outline-none text-indigo-900"
-            />
-            <button 
-                onClick={() => setConfig(prev => ({ 
-                ...prev, 
-                kitQuantities: { ...prev.kitQuantities, [kitType]: prev.kitQuantities[kitType] + 1 } 
-                }))}
-                className="w-10 h-10 rounded-lg bg-white text-indigo-600 font-bold border border-indigo-200 hover:bg-indigo-100 text-lg"
-            >+</button>
+  // Componente de Controle de Categoria (Substitui QuantityInput)
+  const CategoryControl = ({ kitType }: { kitType: keyof typeof KIT_TYPES }) => {
+      const currentLine = config.kitLines[kitType];
+      const quantity = config.kitQuantities[kitType];
+      // Calcula preço unitário base (conjunto ou camisa para simplificar a visualização rápida)
+      // O preço real total considera se é camisa/calção individual no passo 4
+      const basePrice = PRICES[currentLine].conjunto; 
+
+      return (
+        <div className="bg-white rounded-2xl p-4 border border-indigo-100 shadow-sm flex flex-col gap-3 relative overflow-hidden group">
+            {/* Indicador visual da linha */}
+            <div className={`absolute top-0 left-0 w-1 h-full ${LINE_DETAILS[currentLine].color}`}></div>
+            
+            <div className="flex justify-between items-start pl-3">
+                <div>
+                    <label className="block text-lg font-bold text-gray-900">{KIT_TYPES[kitType]}</label>
+                    <span className="text-xs text-gray-500">Configuração individual</span>
+                </div>
+                <div className="text-right">
+                    <span className="block text-xs font-bold text-indigo-600">A partir de</span>
+                    <span className="text-lg font-bold text-gray-900">R$ {basePrice.toFixed(2)}</span>
+                </div>
+            </div>
+
+            <div className="pl-3 grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+                {/* Seletor de Linha */}
+                <div className="relative">
+                    <select
+                        value={currentLine}
+                        onChange={(e) => updateKitLine(kitType, e.target.value as LineType)}
+                        className="w-full appearance-none bg-gray-50 border border-gray-300 text-gray-700 py-2 pl-3 pr-8 rounded-lg leading-tight focus:outline-none focus:bg-white focus:border-indigo-500 text-sm font-medium"
+                    >
+                        {Object.keys(LINE_DETAILS).map((key) => (
+                            <option key={key} value={key}>
+                                Linha {LINE_DETAILS[key as LineType].name}
+                            </option>
+                        ))}
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                        <ChevronDown size={14} />
+                    </div>
+                </div>
+
+                {/* Controle de Quantidade */}
+                <div className="flex items-center justify-end gap-2">
+                    <button 
+                        onClick={() => setConfig(prev => ({ 
+                        ...prev, 
+                        kitQuantities: { ...prev.kitQuantities, [kitType]: Math.max(0, prev.kitQuantities[kitType] - 1) } 
+                        }))}
+                        className="w-8 h-8 rounded-md bg-gray-100 text-indigo-600 font-bold border border-gray-200 hover:bg-gray-200"
+                    >-</button>
+                    <input 
+                        type="number" 
+                        min="0"
+                        value={quantity}
+                        onChange={(e) => setConfig(prev => ({ 
+                        ...prev, 
+                        kitQuantities: { ...prev.kitQuantities, [kitType]: Math.max(0, parseInt(e.target.value) || 0) } 
+                        }))}
+                        className="w-12 text-center text-lg font-bold bg-transparent border-b-2 border-indigo-200 focus:outline-none text-indigo-900"
+                    />
+                    <button 
+                        onClick={() => setConfig(prev => ({ 
+                        ...prev, 
+                        kitQuantities: { ...prev.kitQuantities, [kitType]: prev.kitQuantities[kitType] + 1 } 
+                        }))}
+                        className="w-8 h-8 rounded-md bg-gray-100 text-indigo-600 font-bold border border-gray-200 hover:bg-gray-200"
+                    >+</button>
+                </div>
+            </div>
         </div>
-    </div>
-  );
+      );
+  };
 
 
   // --- Steps ---
 
   const renderStep1 = () => (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-gray-900">Escolha sua Linha Ideal!</h2>
-        <p className="text-gray-500">Clique no ícone de expandir para ver modelos e detalhes técnicos.</p>
+    <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="text-center space-y-4 pt-4">
+        <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 tracking-tight">
+          Vista seu time com <span className="text-indigo-600">Excelência</span>
+        </h1>
+        <p className="text-lg text-gray-600 max-w-2xl mx-auto leading-relaxed">
+          Conheça nossas linhas exclusivas de uniformes esportivos. 
+          Do custo-benefício ao alto rendimento profissional, temos a opção perfeita para sua equipe brilhar em campo.
+        </p>
       </div>
 
-      {/* Seleção de Linha */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Grid Informativo das Linhas */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 px-2">
         {(Object.keys(LINE_DETAILS) as Array<keyof typeof LINE_DETAILS>).map((key) => {
           const detail = LINE_DETAILS[key];
           const Icon = detail.icon;
           return (
-            <div key={key} className="relative group">
-                <button
-                onClick={() => setModalOpen(key)}
-                className="absolute top-3 right-3 text-gray-400 hover:text-indigo-600 z-10 p-2 rounded-full bg-white/80 backdrop-blur-sm transition-all hover:scale-110 shadow-sm border border-transparent hover:border-indigo-100"
-                title="Ver Modelos e Detalhes"
-                >
-                <Maximize2 size={20} />
-                </button>
-                <button
-                onClick={() => setConfig({ ...config, line: key, socks: config.socks.map(s => ({...s, quantity: 0})) })}
-                className={`w-full p-6 rounded-2xl border-2 text-left transition-all duration-200 hover:shadow-xl hover:scale-[1.01] ${
-                    config.line === key 
-                    ? `border-indigo-600 bg-indigo-50/50 ring-4 ring-indigo-200` 
-                    : 'border-gray-200 bg-gray-50 hover:bg-white'
-                }`}
-                >
-                <div className={`w-12 h-12 rounded-full ${detail.color} text-white flex items-center justify-center mb-4 shadow-md`}>
-                    <Icon size={24} />
+            <div key={key} className="relative group bg-white border border-gray-200 rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300 flex flex-col">
+                <div className={`h-2 w-full ${detail.color}`}></div>
+                <div className="p-6 flex-1 flex flex-col">
+                    <div className="flex items-center gap-4 mb-4">
+                        <div className={`w-12 h-12 rounded-full ${detail.color} text-white flex items-center justify-center shadow-md`}>
+                            <Icon size={24} />
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-bold text-gray-900">{detail.name}</h3>
+                            <p className="text-sm font-medium text-indigo-600">{detail.priceDesc}</p>
+                        </div>
+                    </div>
+                    
+                    <p className="text-gray-600 text-sm leading-relaxed mb-6 flex-1">
+                        {detail.desc}
+                    </p>
+
+                    <div className="mt-auto">
+                        <button
+                            onClick={() => setModalOpen(key)}
+                            className="w-full py-3 rounded-xl bg-gray-50 text-gray-700 font-bold border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition-colors flex items-center justify-center gap-2"
+                        >
+                            <Info size={18} /> Ver Detalhes e Modelos
+                        </button>
+                    </div>
                 </div>
-                <h3 className="text-lg font-bold text-gray-900">{detail.name}</h3>
-                <p className="text-xs font-bold text-indigo-600 mt-1 mb-2">{detail.priceDesc}</p>
-                <p className="text-sm text-gray-500 leading-relaxed line-clamp-2">{detail.desc}</p>
-                </button>
             </div>
           );
         })}
       </div>
 
-      <div className="flex justify-end pt-8">
+      {/* CTA Principal */}
+      <div className="flex justify-center pt-8 pb-4">
         <button 
           onClick={() => setStep(2)}
-          className={`px-8 py-4 rounded-xl font-bold flex items-center gap-3 transition-all shadow-lg bg-gray-900 text-white hover:bg-gray-800 hover:scale-105`}
+          className={`px-10 py-5 rounded-2xl font-black text-lg flex items-center gap-3 transition-all shadow-xl shadow-indigo-200 bg-gray-900 text-white hover:bg-indigo-600 hover:scale-105 active:scale-95`}
         >
-          Próximo: Quantidades <ArrowRight size={20} />
+          INICIAR SIMULAÇÃO DE ORÇAMENTO <ArrowRight size={24} />
         </button>
       </div>
+      
       {modalOpen && <ModalDetalhesLinha lineKey={modalOpen} />}
     </div>
   );
@@ -731,35 +1098,33 @@ export default function LandingPage() {
   const renderStep2 = () => (
     <div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-500">
       <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-gray-900">Escolha a quantidade que deseja de cada Item</h2>
-        <p className="text-gray-500">Distribua o pedido entre as categorias e defina a necessidade de meiões.</p>
+        <h2 className="text-2xl font-bold text-gray-900">Personalize Categorias e Quantidades</h2>
+        <p className="text-gray-500">Defina a linha e a quantidade para cada grupo. Ex: Linha Prata e Comissão Diamante.</p>
       </div>
 
       {/* Quantidades Detalhadas (Agrupadas) */}
-      <div className="space-y-6">
+      <div className="space-y-4">
         {/* Grupo 1: Linha / Goleiro */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <QuantityInput kitType="linha" />
-            <QuantityInput kitType="goleiro" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <CategoryControl kitType="linha" />
+            <CategoryControl kitType="goleiro" />
         </div>
         
         {/* Grupo 2: Comissão Técnica / Atleta */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <QuantityInput kitType="comissao" />
-            <QuantityInput kitType="atleta" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <CategoryControl kitType="comissao" />
+            <CategoryControl kitType="atleta" />
         </div>
 
         {/* Grupo 3: Torcida */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <QuantityInput kitType="torcida" />
-            <div className="bg-gray-100 rounded-2xl p-4 flex items-center justify-center border border-gray-200">
-                <span className="text-gray-500 italic text-sm">Espaço reservado para futuras categorias</span>
-            </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <CategoryControl kitType="torcida" />
+            <CategoryControl kitType="staff" />
         </div>
       </div>
       
-      <div className="bg-gray-100 rounded-2xl p-4 text-center border border-gray-200">
-          <p className="text-xl font-bold text-gray-800">Total de Kits/Peças Principais: {totalKits}</p>
+      <div className="bg-indigo-50 rounded-2xl p-4 text-center border border-indigo-100 mt-6">
+          <p className="text-xl font-bold text-indigo-900">Total de Kits/Peças Principais: {totalKits}</p>
           {!minOrderMet && (
             <p className="text-red-500 text-sm mt-1 font-medium flex items-center justify-center gap-1">
                 <AlertTriangle size={16} /> Pedido mínimo: 10 peças. Faltam {10 - totalKits} peças.
@@ -768,19 +1133,19 @@ export default function LandingPage() {
       </div>
 
       {/* Configuração de Meiões Flexível */}
-      <div className="bg-gray-50 rounded-2xl p-6 border border-gray-200 space-y-4">
+      <div className="bg-white rounded-2xl p-6 border border-gray-200 space-y-4 shadow-sm">
           <h3 className="text-lg font-bold text-gray-700 flex items-center gap-2 mb-4"><Footprints size={20} /> Meiões a Parte (Múltiplas Cores)</h3>
           
           <div className="space-y-3">
             {config.socks.map(sock => (
-              <div key={sock.id} className="flex items-center gap-4 bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
+              <div key={sock.id} className="flex items-center gap-4 bg-gray-50 p-3 rounded-lg border border-gray-100 shadow-sm">
                 
                 {/* Seleção de Cor */}
                 <div className="flex-1">
                   <select 
                     value={sock.color}
                     onChange={(e) => updateSockEntry(sock.id, 'color', e.target.value)}
-                    className="w-full h-10 rounded-lg bg-gray-50 border border-gray-300 text-gray-700 px-3 text-sm focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full h-10 rounded-lg bg-white border border-gray-300 text-gray-700 px-3 text-sm focus:ring-indigo-500 focus:border-indigo-500"
                   >
                     {SOCK_COLORS.map(color => (
                       <option 
@@ -799,7 +1164,7 @@ export default function LandingPage() {
                   <label className="text-sm font-medium text-gray-600 min-w-[70px]">Pares:</label>
                   <button 
                     onClick={() => updateSockEntry(sock.id, 'quantity', sock.quantity - 1)}
-                    className="w-8 h-8 rounded-md bg-gray-100 text-gray-600 font-bold hover:bg-gray-200 text-base"
+                    className="w-8 h-8 rounded-md bg-white text-gray-600 font-bold hover:bg-gray-100 text-base border border-gray-200"
                   >-</button>
                   <input 
                       type="number" 
@@ -810,7 +1175,7 @@ export default function LandingPage() {
                   />
                   <button 
                     onClick={() => updateSockEntry(sock.id, 'quantity', sock.quantity + 1)}
-                    className="w-8 h-8 rounded-md bg-gray-100 text-gray-600 font-bold hover:bg-gray-200 text-base"
+                    className="w-8 h-8 rounded-md bg-white text-gray-600 font-bold hover:bg-gray-100 text-base border border-gray-200"
                   >+</button>
                 </div>
 
@@ -898,7 +1263,8 @@ export default function LandingPage() {
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               />
               
-              <h3 className="text-lg font-bold text-gray-800 mb-4">{KIT_TYPES[key]} ({config.kitQuantities[key]} peças)</h3>
+              <h3 className="text-lg font-bold text-gray-800 mb-1">{KIT_TYPES[key]} ({config.kitQuantities[key]} peças)</h3>
+              <p className="text-xs font-bold text-indigo-600 mb-4 bg-indigo-50 px-2 py-1 rounded">Linha: {LINE_DETAILS[config.kitLines[key]].name}</p>
 
               {file ? (
                 <div className="relative w-full h-40 bg-gray-100 rounded-lg overflow-hidden mb-2 group-hover:opacity-90 transition-opacity">
@@ -1000,10 +1366,12 @@ export default function LandingPage() {
 
                   if (isNewSection) {
                     currentKitType = player.kitType;
+                    const lineName = LINE_DETAILS[config.kitLines[player.kitType]].name;
                     sectionHeader = (
                       <tr className="bg-indigo-100/70 border-b border-indigo-200">
-                        <td colSpan={5} className="px-4 py-2 font-bold text-indigo-900 text-left text-sm">
-                          {KIT_TYPES[player.kitType]} ({config.kitQuantities[player.kitType]} Peças)
+                        <td colSpan={5} className="px-4 py-2 font-bold text-indigo-900 text-left text-sm flex justify-between items-center">
+                          <span>{KIT_TYPES[player.kitType]} ({config.kitQuantities[player.kitType]} Peças)</span>
+                          <span className="text-xs bg-white px-2 py-1 rounded border border-indigo-200 text-indigo-600 uppercase tracking-wider">Linha {lineName}</span>
                         </td>
                       </tr>
                     );
@@ -1076,7 +1444,7 @@ export default function LandingPage() {
             
             {/* Resumo Financeiro */}
             <div className="flex flex-col gap-1">
-                <span className="text-gray-400 text-xs uppercase tracking-wider font-semibold">Total Estimado do Orçamento ({LINE_DETAILS[config.line].name})</span>
+                <span className="text-gray-400 text-xs uppercase tracking-wider font-semibold">Total Estimado do Orçamento (Personalizado)</span>
                 <div className="text-3xl font-bold text-green-400">
                 R$ {calculateTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </div>
@@ -1115,7 +1483,7 @@ export default function LandingPage() {
                         : 'bg-gray-600 cursor-not-allowed opacity-50'
                     }`}
                 >
-                    <Download size={20} /> Baixar Orçamento (Arquivo de Texto)
+                    <Download size={20} /> Baixar Orçamento (Arquivo PDF)
                 </button>
             </div>
 
@@ -1176,16 +1544,7 @@ export default function LandingPage() {
     <div className="min-h-screen bg-gray-50 font-sans text-gray-900 selection:bg-indigo-100 relative">
       <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-10 h-10 flex items-center justify-center">
-              {/* Logo D'Sportivo */}
-              <DsPortivoLogo />
-            </div>
-            <span className="text-xl font-bold tracking-tight">D'Sportivo</span>
-          </div>
-          <div className="text-xs font-medium bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full hidden sm:block">
-            Simulador de Orçamento v3.3
-          </div>
+          <BrandLogo />
         </div>
       </header>
 
@@ -1231,12 +1590,13 @@ export default function LandingPage() {
             onClick={() => setShowSizeChart(false)}
         >
             <div 
-                className="bg-white p-2 rounded-xl max-w-2xl w-full relative shadow-2xl overflow-hidden" 
+                className="bg-white p-2 rounded-xl max-w-5xl w-full relative shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" 
                 onClick={e => e.stopPropagation()}
             >
-                <div className="flex justify-between items-center p-4 border-b border-gray-100 mb-2">
+                {/* Header do Modal */}
+                <div className="flex justify-between items-center p-4 border-b border-gray-100 bg-white sticky top-0 z-10">
                     <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                        <Ruler className="text-indigo-600"/> Tabela de Medidas
+                        <Ruler className="text-indigo-600"/> TABELA DE MEDIDAS
                     </h3>
                     <button 
                         onClick={() => setShowSizeChart(false)}
@@ -1246,14 +1606,87 @@ export default function LandingPage() {
                     </button>
                 </div>
                 
-                <div className="p-4 bg-gray-50 flex items-center justify-center min-h-[300px]">
-                    <img 
-                        src={SIZE_CHART_URL} 
-                        alt="Tabela de Medidas" 
-                        className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-sm"
-                    />
+                {/* Conteúdo com Scroll */}
+                <div className="w-full overflow-y-auto p-6 md:p-8 bg-gray-50/50">
+                    
+                    {/* Botões de Seleção de Linha */}
+                    <div className="flex justify-center gap-4 mb-8">
+                        <button
+                            onClick={() => setActiveSizeTab('standard')}
+                            className={`px-6 py-3 rounded-lg font-bold text-sm transition-all shadow-sm border-2 ${
+                                activeSizeTab === 'standard' 
+                                ? 'bg-blue-600 text-white border-blue-600 shadow-blue-200 ring-2 ring-blue-100' 
+                                : 'bg-white text-gray-500 border-gray-200 hover:border-blue-400 hover:text-blue-500'
+                            }`}
+                        >
+                            LINHA PRATA / OURO / EMPRESARIAL
+                        </button>
+                        <button
+                            onClick={() => setActiveSizeTab('diamond')}
+                            className={`px-6 py-3 rounded-lg font-bold text-sm transition-all shadow-sm border-2 ${
+                                activeSizeTab === 'diamond' 
+                                ? 'bg-indigo-900 text-white border-indigo-900 shadow-indigo-200 ring-2 ring-indigo-100' 
+                                : 'bg-white text-gray-500 border-gray-200 hover:border-indigo-400 hover:text-indigo-900'
+                            }`}
+                        >
+                            LINHA DIAMANTE (SLIM)
+                        </button>
+                    </div>
+
+                    {/* Cabeçalho de Instruções */}
+                    <div className="mb-8 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="flex items-center gap-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                            <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xl shadow-md">1</div>
+                            <div>
+                                <span className="font-extrabold text-gray-900 block text-lg">LARGURA</span>
+                                <span className="text-gray-600 text-sm">Medir de ponta a ponta (axila a axila) usando uma fita métrica ou trena sobre uma peça esticada.</span>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                             <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xl shadow-md">2</div>
+                            <div>
+                                <span className="font-extrabold text-gray-900 block text-lg">ALTURA</span>
+                                <span className="text-gray-600 text-sm">Medir do ponto mais alto da gola até a barra inferior da camisa.</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div className="text-center text-sm text-gray-500 mb-8 space-y-2 bg-yellow-50 p-4 rounded-lg border border-yellow-100">
+                        <p>• As medidas correspondem à largura e altura de camisas adultas e infantis.</p>
+                        <p>• <span className="font-bold">Atenção:</span> As medidas podem variar em média 5% para mais ou para menos devido ao processo manual de costura.</p>
+                        <p className="font-black text-gray-800 uppercase tracking-wide">• NA DÚVIDA PEÇA UM TAMANHO A MAIS</p>
+                    </div>
+
+                    {/* Grids das Tabelas (Dinâmicas Baseadas na Aba) */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start animate-in fade-in slide-in-from-bottom-2 duration-300" key={activeSizeTab}>
+                        <SizeTable 
+                          title={SIZE_TABLES[activeSizeTab].masculina.title} 
+                          headerColor={SIZE_TABLES[activeSizeTab].masculina.headerColor}
+                          headers={SIZE_TABLES[activeSizeTab].masculina.headers}
+                          keys={SIZE_TABLES[activeSizeTab].masculina.keys}
+                          data={SIZE_TABLES[activeSizeTab].masculina.data} 
+                        />
+                        <SizeTable 
+                          title={SIZE_TABLES[activeSizeTab].feminina.title} 
+                          headerColor={SIZE_TABLES[activeSizeTab].feminina.headerColor}
+                          headers={SIZE_TABLES[activeSizeTab].feminina.headers}
+                          keys={SIZE_TABLES[activeSizeTab].feminina.keys}
+                          data={SIZE_TABLES[activeSizeTab].feminina.data} 
+                        />
+                        <SizeTable 
+                          title={SIZE_TABLES[activeSizeTab].infantil.title} 
+                          headerColor={SIZE_TABLES[activeSizeTab].infantil.headerColor}
+                          headers={SIZE_TABLES[activeSizeTab].infantil.headers}
+                          keys={SIZE_TABLES[activeSizeTab].infantil.keys}
+                          data={SIZE_TABLES[activeSizeTab].infantil.data} 
+                        />
+                    </div>
                 </div>
-                <p className="text-center text-xs text-gray-400 p-2">Clique fora para fechar</p>
+
+                {/* Footer Fixo (Mobile friendly) */}
+                <div className="p-3 bg-white border-t border-gray-100 text-center text-xs text-gray-400">
+                     Clique fora para fechar ou no X no canto superior direito.
+                </div>
             </div>
         </div>
       )}
