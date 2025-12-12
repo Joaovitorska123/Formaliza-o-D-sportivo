@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   Upload, 
-  Send, 
   CheckCircle2, 
   ArrowRight, 
   ArrowLeft,
@@ -15,7 +14,12 @@ import {
   Trash2,
   Save,
   Download,
-  AlertTriangle
+  AlertTriangle,
+  Briefcase,
+  Gem,
+  Check,
+  Image as ImageIcon,
+  Ruler // Novo ícone importado
 } from 'lucide-react';
 
 import { initializeApp } from 'firebase/app';
@@ -39,17 +43,87 @@ declare const __app_id: string;
 declare const __firebase_config: string;
 declare const __initial_auth_token: string;
 
-// --- Constantes de Preços (Estimativa) ---
+// --- Constantes de Preços ---
 const PRICES = {
-  bronze: { camisa: 45, calcao: 25, conjunto: 65, meiao: 15 },
-  prata: { camisa: 65, calcao: 35, conjunto: 90, meiao: 20 },
-  ouro: { camisa: 85, calcao: 45, conjunto: 120, meiao: 25 },
+  prata: { camisa: 42.90, calcao: 32.00, conjunto: 74.90, meiao: 20.00 },
+  ouro: { camisa: 49.90, calcao: 35.00, conjunto: 84.90, meiao: 25.00 },
+  diamante: { camisa: 69.90, calcao: 38.00, conjunto: 107.90, meiao: 30.00 },
+  empresarial: { camisa: 49.90, calcao: 35.00, conjunto: 84.90, meiao: 20.00 },
 };
 
+// URL DA TABELA DE MEDIDAS (Substitua esta URL pela sua imagem real)
+const SIZE_CHART_URL = "https://placehold.co/600x800/png?text=Tabela+de+Medidas\n(Substitua+pela+sua+imagem)";
+
+// --- Detalhes Ricos das Linhas (Atualizado com Modelos e Features) ---
 const LINE_DETAILS = {
-  bronze: { name: 'Linha Bronze', desc: 'Tecido Dry Basic, acabamento padrão. Ideal para treinos e jogos casuais.', color: 'bg-amber-600' },
-  prata: { name: 'Linha Prata', desc: 'Tecido Dry Fit Pro, costura reforçada. Excelente custo-benefício para campeonatos.', color: 'bg-gray-400' },
-  ouro: { name: 'Linha Ouro', desc: 'Tecnologia Aero, Elastano e acabamento premium. Conforto e performance de elite.', color: 'bg-yellow-500' },
+  prata: { 
+    name: 'Prata', 
+    priceDesc: 'Camisa R$ 42,90 | Calção R$ 32,00',
+    desc: 'Uma camisa com excelente custo-benefício. Ideal para quem busca economia sem abrir mão da qualidade.', 
+    fullDesc: 'A Linha Prata (Monaco) é a porta de entrada para a qualidade D\'Sportivo. Focada em times amadores, interclasses e treinos, ela oferece um tecido leve com secagem rápida.',
+    features: [
+      'Tecido Dry Esportivo Leve',
+      'Modelagem Padrão Confortável',
+      'Proteção UV Básica',
+      'Ideal para uso frequente e treinos',
+      'Personalização Total (Sublimação)'
+    ],
+    color: 'bg-gray-400',
+    textColor: 'text-gray-600',
+    icon: Trophy,
+    models: [1, 2, 3, 4] // Placeholders para 4 modelos
+  },
+  ouro: { 
+    name: 'Ouro', 
+    priceDesc: 'Camisa R$ 49,90 | Calção R$ 35,00',
+    desc: 'Excelente custo-benefício, porém com tecido melhor e acabamento superior.', 
+    fullDesc: 'A Linha Ouro (Bélgica) eleva o nível do seu jogo. Com um tecido de gramatura superior e tramas mais fechadas, oferece maior resistência a puxões e durabilidade, mantendo o conforto térmico.',
+    features: [
+      'Tecido Dry Tech Premium (Maior Gramatura)',
+      'Costura Reforçada Dupla',
+      'Acabamento de Gola Diferenciado',
+      'Alta Durabilidade de Cores',
+      'Toque mais macio'
+    ],
+    color: 'bg-yellow-500',
+    textColor: 'text-yellow-600',
+    icon: Trophy,
+    models: [1, 2, 3, 4]
+  },
+  diamante: { 
+    name: 'Diamante', 
+    priceDesc: 'Camisa R$ 69,90 | Calção R$ 38,00',
+    desc: 'Muda totalmente a modelagem, deixando o visual muito profissional e exclusivo.', 
+    fullDesc: 'A Linha Diamante (Vanilha/Polo) é o topo de linha para atletas exigentes. Modelagem Slim Fit profissional, tecidos tecnológicos com elastano e golas exclusivas que impõem respeito em campo.',
+    features: [
+      'Modelagem Profissional (Slim/Anatômica)',
+      'Tecido com Elastano/Tecnologia Aero',
+      'Golas Especiais (Polo, Padre, V Transpassado)',
+      'Recortes Laterais Respiráveis',
+      'Acabamento de Elite'
+    ],
+    color: 'bg-cyan-500',
+    textColor: 'text-cyan-600',
+    icon: Gem,
+    models: [1, 2, 3, 4]
+  },
+  empresarial: { 
+    name: 'Empresarial / Eventos', 
+    priceDesc: 'Camisa R$ 49,90',
+    desc: 'Linha desenvolvida especificamente para atender empresas, eventos e outros grupos.', 
+    fullDesc: 'A solução perfeita para uniformização de equipes, eventos corporativos, atléticas universitárias e staffs. Foco na sobriedade, conforto para o dia a dia e representação fiel da identidade visual da marca.',
+    features: [
+      'Modelagem Unissex Versátil (Redonda ou Polo)',
+      'Tecido Antipilling (Não dá bolinha)',
+      'Fácil de Lavar e Passar',
+      'Opção de Polo sem Recorte',
+      'Ideal para grandes quantidades'
+    ],
+    color: 'bg-slate-800',
+    textColor: 'text-slate-700',
+    icon: Briefcase,
+    models: [1, 2, 3, 4]
+  },
 };
 
 // CATEGORIAS DE KITS SOLICITADAS
@@ -66,10 +140,12 @@ const SOCK_COLORS = [
   'Verde Bandeira', 'Vermelho', 'Amarelo Ouro'
 ];
 
-// NOVOS TAMANHOS SOLICITADOS
-const MASC_SIZES = ['2', '4', '6', '8', '10', '12', '14', '16', 'P', 'M', 'G', 'GG', 'XG', 'ESP', 'G3'];
-const FEM_SIZES = ['P BL', 'M BL', 'G BL', 'GG BL', 'XG BL', 'ESP BL'];
-const ALL_SIZES = [...MASC_SIZES, ...FEM_SIZES];
+// NOVOS TAMANHOS SOLICITADOS (AGRUPADOS)
+const SIZES_INFANTIL = ['2', '4', '6', '8', '10', '12', '14', '16'];
+const SIZES_ADULTO = ['P', 'M', 'G', 'GG', 'XG', 'ESP', 'G3'];
+const SIZES_FEMININO = ['P BL', 'M BL', 'G BL', 'GG BL', 'XG BL', 'ESP BL'];
+// Mantendo ALL_SIZES para compatibilidade
+const ALL_SIZES = [...SIZES_INFANTIL, ...SIZES_ADULTO, ...SIZES_FEMININO];
 
 
 interface SockItem {
@@ -92,7 +168,7 @@ interface CustomerInfo {
 }
 
 interface Config {
-  line: 'bronze' | 'prata' | 'ouro';
+  line: 'prata' | 'ouro' | 'diamante' | 'empresarial';
   kitQuantities: Record<keyof typeof KIT_TYPES, number>;
   socks: SockItem[];
   nextSockId: number;
@@ -108,7 +184,7 @@ const INITIAL_CONFIG: Config = {
     customerInfo: { customerName: '', customerPhone: '' },
 };
 
-// SVG do Logo D'Sportivo (Corrigido para evitar chaves duplicadas no objeto style)
+// SVG do Logo D'Sportivo
 const DsPortivoLogo = () => (
     <svg 
         width="24" 
@@ -118,21 +194,17 @@ const DsPortivoLogo = () => (
         xmlns="http://www.w3.org/2000/svg"
         className="text-indigo-600"
     >
-        {/* A forma Z cortada do logo, com cores definidas (Mais simples e eficaz) */}
         <g transform="translate(0, 0)">
-            {/* Parte superior/esquerda escura */}
             <path d="M 1 0 L 23 0 L 23 10 L 15 10 L 9 16 L 1 16 Z" 
                   fill="currentColor" 
                   className="text-gray-900" 
                   style={{ transform: 'translateY(-2px)' }}
             />
-            {/* Parte inferior/direita colorida */}
             <path d="M 1 8 L 9 8 L 15 14 L 23 14 L 23 24 L 1 24 Z" 
                   fill="currentColor" 
                   className="text-indigo-600" 
                   style={{ transform: 'translateY(2px)' }}
             />
-            {/* Corte central branco/claro */}
             <path d="M 10 10 H 14 V 14 H 10 Z" 
                   fill="white" 
                   className="text-white" 
@@ -152,11 +224,12 @@ export default function LandingPage() {
 
   // --- Estados do Aplicativo ---
   const [step, setStep] = useState(1);
-  const [modalOpen, setModalOpen] = useState<'bronze' | 'prata' | 'ouro' | null>(null);
+  const [modalOpen, setModalOpen] = useState<'prata' | 'ouro' | 'diamante' | 'empresarial' | null>(null);
   const [config, setConfig] = useState<Config>(INITIAL_CONFIG);
   const [roster, setRoster] = useState<RosterItem[]>([]);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [hasReviewed, setHasReviewed] = useState(false); // Novo estado para controle do checkbox
+  const [showSizeChart, setShowSizeChart] = useState(false); // Novo estado para modal de medidas
   
   const [designFiles, setDesignFiles] = useState<Record<keyof typeof KIT_TYPES, string | null>>({
     linha: null, goleiro: null, comissao: null, atleta: null, torcida: null,
@@ -164,8 +237,8 @@ export default function LandingPage() {
 
   // --- Firebase Init e Auth ---
   useEffect(() => {
-    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-    const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+    const appId = typeof __app_id !== 'undefined' ? (__app_id as string) : 'default-app-id';
+    const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? (__firebase_config as string) : '{}');
 
     if (Object.keys(firebaseConfig).length === 0) {
       console.warn("Firebase config is missing. Running in offline mode (some features disabled).");
@@ -187,7 +260,7 @@ export default function LandingPage() {
         } else {
           // Tenta signInWithCustomToken ou Anônimo
           if (typeof __initial_auth_token !== 'undefined') {
-            await signInWithCustomToken(newAuth, __initial_auth_token);
+            await signInWithCustomToken(newAuth, (__initial_auth_token as any) as string);
           } else {
             const anonUser = await signInAnonymously(newAuth);
             setUserId(anonUser.user.uid);
@@ -205,12 +278,11 @@ export default function LandingPage() {
   // --- Funções de Persistência ---
   const getDocRef = useCallback((db: Firestore | null, uid: string | null, appId: string) => {
     if (!db || !uid) return null;
-    // Caminho privado: /artifacts/{appId}/users/{userId}/orcamento
     return doc(db, `artifacts/${appId}/users/${uid}/orcamento`, 'draft');
   }, []);
 
   const saveProgress = async () => {
-    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+    const appId = typeof __app_id !== 'undefined' ? (__app_id as string) : 'default-app-id';
     const docRef = getDocRef(db, userId, appId);
 
     if (!docRef) {
@@ -249,7 +321,6 @@ export default function LandingPage() {
         if (data.config) setConfig(data.config);
         if (data.roster) setRoster(data.roster);
         if (data.designFiles) setDesignFiles(data.designFiles);
-        console.log("Progresso carregado com sucesso.");
       }
     } catch (e) {
       console.warn("Nenhum rascunho encontrado ou erro ao carregar:", e);
@@ -273,23 +344,17 @@ export default function LandingPage() {
   
   const calculateTotal = () => {
     const prices = PRICES[config.line];
-    
-    // 1. Soma itens da lista (Peças/Kits)
     const rosterTotal = roster.reduce((acc, item) => {
       const itemType = item.type as 'camisa' | 'calcao' | 'conjunto';
       const itemPrice = prices[itemType] || prices.conjunto;
       return acc + itemPrice;
     }, 0);
-
-    // 2. Soma os meiões
     const socksTotal = totalSocks * prices.meiao;
-
     return rosterTotal + socksTotal;
   };
 
   // --- Efeitos ---
 
-  // Atualiza a lista de atletas (roster) quando as quantidades mudam
   useEffect(() => {
     setRoster(prev => {
       const newRoster: RosterItem[] = [];
@@ -377,28 +442,80 @@ export default function LandingPage() {
 
   // --- Funções de Exportação ---
   const generateOrderText = () => {
-    // 1. Cabeçalho Mínimo e Dados do Cliente
     let text = `*PEDIDO D'SPORTIVO*\n`;
     text += `------------------------------------------------\n`;
     text += `CLIENTE: ${config.customerInfo.customerName || 'NÃO INFORMADO'}\n`;
     text += `CONTATO: ${config.customerInfo.customerPhone || 'NÃO INFORMADO'}\n`;
     text += `LINHA: ${LINE_DETAILS[config.line].name}\n`;
     text += `------------------------------------------------\n`;
-    text += `*ITENS DO PEDIDO:*\n`;
     
-    // 2. Lista Simplificada: NOME NUMERO TAMANHO CATEGORIA PEÇA
-    roster.forEach(p => {
-       const categoria = KIT_TYPES[p.kitType];
-       const itemType = p.type === 'conjunto' ? 'CONJUNTO' : p.type === 'camisa' ? 'CAMISA' : 'CALÇÃO';
-       const nome = p.name || '-';
-       const numero = p.number || '-';
-       
-       text += `NOME: ${nome} | NÚMERO: ${numero} | TAMANHO: ${p.size} | CATEGORIA: ${categoria} | PEÇA: ${itemType}\n`;
+    // --- RESUMO QUANTITATIVO (GRADE) ---
+    text += `*RESUMO DE GRADE (QUANTIDADES)*\n`;
+    
+    const summary: Record<string, Record<string, number>> = {};
+    const catOrder = ['INFANTIL', 'FEMININO (BABY LOOK)', 'ADULTO'];
+    const sizeOrder = [...SIZES_INFANTIL, ...SIZES_FEMININO, ...SIZES_ADULTO];
+
+    roster.forEach(item => {
+        let category = 'ADULTO';
+        if (SIZES_INFANTIL.includes(item.size)) category = 'INFANTIL';
+        else if (SIZES_FEMININO.includes(item.size)) category = 'FEMININO (BABY LOOK)';
+        
+        if (!summary[category]) summary[category] = {};
+        if (!summary[category][item.size]) summary[category][item.size] = 0;
+        summary[category][item.size]++;
     });
 
-    // 3. Meiões (se houver)
+    catOrder.forEach(cat => {
+        if (summary[cat]) {
+            text += `\n>>> ${cat}:\n`;
+            Object.entries(summary[cat])
+                .sort((a, b) => sizeOrder.indexOf(a[0]) - sizeOrder.indexOf(b[0]))
+                .forEach(([size, count]) => {
+                    text += `    [ ${size} ]: ${count} unidades\n`;
+                });
+        }
+    });
+
+    text += `\n------------------------------------------------\n`;
+    text += `*DETALHAMENTO AGRUPADO POR TAMANHO:*\n`;
+
+    // --- LISTA DETALHADA AGRUPADA ---
+    catOrder.forEach(cat => {
+        // Filtra itens desta categoria
+        const categoryItems = roster.filter(item => {
+             if (cat === 'INFANTIL') return SIZES_INFANTIL.includes(item.size);
+             if (cat === 'FEMININO (BABY LOOK)') return SIZES_FEMININO.includes(item.size);
+             return SIZES_ADULTO.includes(item.size); // Default to ADULTO
+        });
+
+        if (categoryItems.length > 0) {
+            text += `\n================================\n`;
+            text += ` CATEGORIA: ${cat}\n`;
+            text += `================================\n`;
+            
+            // Agrupa por tamanho, ordenando pelo sizeOrder
+            const uniqueSizes = Array.from(new Set(categoryItems.map(i => i.size)))
+                                     .sort((a, b) => sizeOrder.indexOf(a) - sizeOrder.indexOf(b));
+
+            uniqueSizes.forEach(size => {
+                const itemsInSize = categoryItems.filter(i => i.size === size);
+                text += `\n   ---> TAMANHO: ${size} (Total: ${itemsInSize.length})\n`;
+                
+                itemsInSize.forEach((p, idx) => {
+                    const categoria = KIT_TYPES[p.kitType];
+                    const itemType = p.type === 'conjunto' ? 'CONJUNTO' : p.type === 'camisa' ? 'CAMISA' : 'CALÇÃO';
+                    const nome = p.name || '---';
+                    const numero = p.number || '---';
+                    text += `      ${idx + 1}. NOME: ${nome} | Nº: ${numero} | TIPO: ${categoria} (${itemType})\n`;
+                });
+            });
+        }
+    });
+
+
     if (config.socks.some(s => s.quantity > 0)) {
-        text += `------------------------------------------------\n`;
+        text += `\n------------------------------------------------\n`;
         text += `*MEIÕES EXTRAS:*\n`;
         config.socks.forEach(sock => {
             if (sock.quantity > 0) {
@@ -408,12 +525,6 @@ export default function LandingPage() {
     }
     
     return text.trim();
-  };
-
-  const generateWhatsAppLink = () => {
-    const numeroUniSport = '5516991679072'; // Número fornecido pelo usuário para teste
-    const text = generateOrderText();
-    return `https://wa.me/${numeroUniSport}?text=${encodeURIComponent(text.replace(/\n/g, '%0A'))}`;
   };
 
   const handleDownload = () => {
@@ -432,27 +543,97 @@ export default function LandingPage() {
 
   // --- Componentes ---
 
+  // Modal Expandido tipo Página
   const ModalDetalhesLinha = ({ lineKey }: { lineKey: keyof typeof LINE_DETAILS }) => {
     const details = LINE_DETAILS[lineKey];
+    const Icon = details.icon;
+
     return (
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setModalOpen(null)}>
-        <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 space-y-4 animate-in zoom-in-95 duration-300" onClick={e => e.stopPropagation()}>
-          <div className="flex justify-between items-start">
-            <h3 className={`text-2xl font-bold ${details.color.replace('bg-', 'text-')}`}>{details.name}</h3>
-            <button onClick={() => setModalOpen(null)} className="text-gray-400 hover:text-gray-800"><X size={24} /></button>
-          </div>
-          <p className="text-gray-700">{details.desc}</p>
-          
-          <div className="bg-gray-100 p-4 rounded-lg flex items-center justify-center h-48">
-            <div className="text-center text-gray-500">
-              <Shirt size={32} className="mx-auto mb-2" />
-              
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4 md:p-8" onClick={() => setModalOpen(null)}>
+        <div 
+            className="bg-white w-full max-w-5xl h-[90vh] md:h-auto md:max-h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-300" 
+            onClick={e => e.stopPropagation()}
+        >
+          {/* Header Fixo */}
+          <div className={`p-6 border-b flex items-start justify-between bg-gray-50`}>
+            <div className="flex items-center gap-4">
+                <div className={`w-14 h-14 rounded-full ${details.color} text-white flex items-center justify-center shadow-lg`}>
+                    <Icon size={32} />
+                </div>
+                <div>
+                    <h3 className={`text-3xl font-bold ${details.textColor || 'text-gray-900'}`}>{details.name}</h3>
+                    <p className="text-lg font-bold text-gray-700">{details.priceDesc}</p>
+                </div>
             </div>
+            <button onClick={() => setModalOpen(null)} className="text-gray-400 hover:text-red-500 transition-colors bg-white rounded-full p-2 shadow-sm border border-gray-100">
+                <X size={24} />
+            </button>
           </div>
 
-          <p className="text-sm text-gray-500 pt-2">
-            *O valor desta linha é uma estimativa baseada no seu nível de qualidade.
-          </p>
+          {/* Conteúdo Scrollável */}
+          <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-8 custom-scrollbar">
+             
+             {/* Descrição e Features */}
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div>
+                    <h4 className="text-xl font-bold text-gray-900 mb-3">Sobre a Linha</h4>
+                    <p className="text-gray-600 leading-relaxed text-lg text-justify">{details.fullDesc}</p>
+                </div>
+                
+                <div className="bg-gray-50 rounded-xl p-6 border border-gray-100">
+                    <h4 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                        <CheckCircle2 size={20} className="text-green-600"/> Destaques da Categoria
+                    </h4>
+                    <ul className="space-y-3">
+                        {details.features.map((feature, idx) => (
+                            <li key={idx} className="flex items-start gap-3">
+                                <Check size={18} className="text-indigo-600 mt-1 flex-shrink-0" />
+                                <span className="text-gray-700 font-medium">{feature}</span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+             </div>
+
+             {/* Galeria de Modelos */}
+             <div className="pt-4 border-t border-gray-100">
+                <h4 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+                    <ImageIcon size={24} className="text-indigo-600"/> Modelos Disponíveis
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {details.models.map((modelId) => (
+                        <div key={modelId} className="group cursor-pointer">
+                            <div className="aspect-[3/4] bg-gray-100 rounded-xl border-2 border-gray-100 group-hover:border-indigo-500 transition-all flex flex-col items-center justify-center relative overflow-hidden">
+                                {/* Placeholder para Imagem - Substituir src quando tiver as imagens */}
+                                <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-300 group-hover:text-indigo-400 transition-colors">
+                                    <Shirt size={48} strokeWidth={1} />
+                                    <span className="text-xs font-medium mt-2">Modelo Exemplo {modelId}</span>
+                                    <span className="text-[10px] mt-1 opacity-70">(Imagem em breve)</span>
+                                </div>
+                                {/* <img src={`/path/to/image-${modelId}.jpg`} className="w-full h-full object-cover" /> */}
+                            </div>
+                            <p className="text-center mt-3 font-medium text-gray-600 group-hover:text-indigo-600">Ref. {details.name.split(' ')[0]}-{modelId.toString().padStart(2, '0')}</p>
+                        </div>
+                    ))}
+                </div>
+             </div>
+          </div>
+
+          {/* Footer de Ação */}
+          <div className="p-4 border-t bg-gray-50 flex justify-end gap-3">
+             <button onClick={() => setModalOpen(null)} className="px-6 py-3 font-medium text-gray-600 hover:text-gray-900 transition-colors">
+                 Fechar Visualização
+             </button>
+             <button 
+                onClick={() => {
+                    setConfig({ ...config, line: lineKey, socks: config.socks.map(s => ({...s, quantity: 0})) });
+                    setModalOpen(null);
+                }}
+                className={`px-8 py-3 rounded-xl font-bold text-white shadow-lg transition-transform hover:scale-105 active:scale-95 ${details.color.replace('bg-', 'bg-').replace('-400', '-600').replace('-500', '-600')}`}
+             >
+                Selecionar Linha {details.name}
+             </button>
+          </div>
         </div>
       </div>
     );
@@ -498,36 +679,41 @@ export default function LandingPage() {
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="text-center mb-8">
         <h2 className="text-2xl font-bold text-gray-900">Escolha sua Linha Ideal!</h2>
-        <p className="text-gray-500">Defina o padrão de tecido e acabamento para seu pedido.</p>
+        <p className="text-gray-500">Clique no ícone de expandir para ver modelos e detalhes técnicos.</p>
       </div>
 
       {/* Seleção de Linha */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {(Object.keys(LINE_DETAILS) as Array<keyof typeof LINE_DETAILS>).map((key) => (
-          <div key={key} className="relative">
-            <button
-              onClick={() => setModalOpen(key)}
-              className="absolute top-3 right-3 text-gray-400 hover:text-indigo-600 z-10 p-1 rounded-full bg-white/70 backdrop-blur-sm transition-colors"
-              title="Ver detalhes da Linha"
-            >
-              <Maximize2 size={16} />
-            </button>
-            <button
-              onClick={() => setConfig({ ...config, line: key, socks: config.socks.map(s => ({...s, quantity: 0})) })}
-              className={`w-full p-6 rounded-2xl border-2 text-left transition-all duration-200 hover:shadow-xl hover:scale-[1.02] ${
-                config.line === key 
-                  ? `border-indigo-600 bg-indigo-50/50 ring-4 ring-indigo-200` 
-                  : 'border-gray-200 bg-gray-50 hover:bg-white'
-              }`}
-            >
-              <div className={`w-12 h-12 rounded-full ${LINE_DETAILS[key].color} text-white flex items-center justify-center mb-4 shadow-md`}>
-                <Trophy size={24} />
-              </div>
-              <h3 className="text-lg font-bold text-gray-900">{LINE_DETAILS[key].name}</h3>
-              <p className="text-sm text-gray-500 mt-2 leading-relaxed line-clamp-2">{LINE_DETAILS[key].desc}</p>
-            </button>
-          </div>
-        ))}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {(Object.keys(LINE_DETAILS) as Array<keyof typeof LINE_DETAILS>).map((key) => {
+          const detail = LINE_DETAILS[key];
+          const Icon = detail.icon;
+          return (
+            <div key={key} className="relative group">
+                <button
+                onClick={() => setModalOpen(key)}
+                className="absolute top-3 right-3 text-gray-400 hover:text-indigo-600 z-10 p-2 rounded-full bg-white/80 backdrop-blur-sm transition-all hover:scale-110 shadow-sm border border-transparent hover:border-indigo-100"
+                title="Ver Modelos e Detalhes"
+                >
+                <Maximize2 size={20} />
+                </button>
+                <button
+                onClick={() => setConfig({ ...config, line: key, socks: config.socks.map(s => ({...s, quantity: 0})) })}
+                className={`w-full p-6 rounded-2xl border-2 text-left transition-all duration-200 hover:shadow-xl hover:scale-[1.01] ${
+                    config.line === key 
+                    ? `border-indigo-600 bg-indigo-50/50 ring-4 ring-indigo-200` 
+                    : 'border-gray-200 bg-gray-50 hover:bg-white'
+                }`}
+                >
+                <div className={`w-12 h-12 rounded-full ${detail.color} text-white flex items-center justify-center mb-4 shadow-md`}>
+                    <Icon size={24} />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900">{detail.name}</h3>
+                <p className="text-xs font-bold text-indigo-600 mt-1 mb-2">{detail.priceDesc}</p>
+                <p className="text-sm text-gray-500 leading-relaxed line-clamp-2">{detail.desc}</p>
+                </button>
+            </div>
+          );
+        })}
       </div>
 
       <div className="flex justify-end pt-8">
@@ -764,7 +950,7 @@ export default function LandingPage() {
     const canSubmit = requiredFieldsFilled && hasReviewed;
 
     return (
-      <div className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-500">
+      <div className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-500 relative">
         <div className="flex flex-col md:flex-row justify-between items-end mb-4 border-b border-gray-100 pb-4">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">4. Formalização do Pedido</h2>
@@ -854,12 +1040,20 @@ export default function LandingPage() {
                             value={player.size}
                             onChange={(e) => handleRosterChange(index, 'size', e.target.value)}
                           >
-                            {ALL_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
+                             <optgroup label="Infantil / Juvenil">
+                                {SIZES_INFANTIL.map(s => <option key={s} value={s}>{s}</option>)}
+                             </optgroup>
+                             <optgroup label="Adulto">
+                                {SIZES_ADULTO.map(s => <option key={s} value={s}>{s}</option>)}
+                             </optgroup>
+                             <optgroup label="Baby Look (Feminina)">
+                                {SIZES_FEMININO.map(s => <option key={s} value={s}>{s}</option>)}
+                             </optgroup>
                           </select>
                         </td>
                         <td className="px-4 py-2">
                           <select 
-                            className="w-full bg-indigo-50/50 border-none rounded text-indigo-900 font-medium py-1 px-2 text-xs focus:ring-2 focus:ring-indigo-200"
+                            className="w-full bg-indigo-50/50 border-none rounded text-indigo-900 font-bold focus:ring-2 focus:ring-indigo-200 h-14 text-lg md:h-auto md:py-1 md:text-xs md:font-medium px-2 shadow-sm"
                             value={player.type}
                             onChange={(e) => handleRosterChange(index, 'type', e.target.value)}
                           >
@@ -923,21 +1117,6 @@ export default function LandingPage() {
                 >
                     <Download size={20} /> Baixar Orçamento (Arquivo de Texto)
                 </button>
-
-                {/* 2. Enviar WhatsApp */}
-                <a 
-                    href={canSubmit ? generateWhatsAppLink() : '#'}
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    onClick={(e) => { if (!canSubmit) e.preventDefault(); }}
-                    className={`flex-1 px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg ${
-                        canSubmit
-                        ? 'bg-[#25D366] hover:bg-[#20bd5a] text-white hover:scale-105 shadow-green-200/50'
-                        : 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
-                    }`}
-                >
-                    <Send size={20} /> Enviar via WhatsApp
-                </a>
             </div>
 
             {!requiredFieldsFilled && (
@@ -994,7 +1173,7 @@ export default function LandingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans text-gray-900 selection:bg-indigo-100">
+    <div className="min-h-screen bg-gray-50 font-sans text-gray-900 selection:bg-indigo-100 relative">
       <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -1025,13 +1204,59 @@ export default function LandingPage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100 p-6 md:p-10 min-h-[600px]">
+        <div className="bg-white rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100 p-6 md:p-10 min-h-[600px] relative">
           {step === 1 && renderStep1()}
           {step === 2 && renderStep2()}
           {step === 3 && renderStep3()}
           {step === 4 && renderStep4()}
         </div>
       </main>
+
+      {/* Botão Flutuante da Tabela de Medidas (Aparece apenas na etapa 4) */}
+      {step === 4 && (
+        <button
+            onClick={() => setShowSizeChart(true)}
+            className="fixed bottom-6 right-6 z-40 bg-indigo-600 text-white p-4 rounded-full shadow-lg hover:scale-110 transition-transform flex items-center justify-center border-4 border-indigo-100"
+            title="Ver Tabela de Medidas"
+            aria-label="Ver Tabela de Medidas"
+        >
+            <Ruler size={24} />
+        </button>
+      )}
+
+      {/* Modal da Tabela de Medidas */}
+      {showSizeChart && (
+        <div 
+            className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+            onClick={() => setShowSizeChart(false)}
+        >
+            <div 
+                className="bg-white p-2 rounded-xl max-w-2xl w-full relative shadow-2xl overflow-hidden" 
+                onClick={e => e.stopPropagation()}
+            >
+                <div className="flex justify-between items-center p-4 border-b border-gray-100 mb-2">
+                    <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                        <Ruler className="text-indigo-600"/> Tabela de Medidas
+                    </h3>
+                    <button 
+                        onClick={() => setShowSizeChart(false)}
+                        className="p-2 hover:bg-gray-100 rounded-full text-gray-500 transition-colors"
+                    >
+                        <X size={24} />
+                    </button>
+                </div>
+                
+                <div className="p-4 bg-gray-50 flex items-center justify-center min-h-[300px]">
+                    <img 
+                        src={SIZE_CHART_URL} 
+                        alt="Tabela de Medidas" 
+                        className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-sm"
+                    />
+                </div>
+                <p className="text-center text-xs text-gray-400 p-2">Clique fora para fechar</p>
+            </div>
+        </div>
+      )}
     </div>
   );
 }
