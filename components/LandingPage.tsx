@@ -1,37 +1,31 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Upload, 
-  CheckCircle2, 
   ArrowRight, 
   ArrowLeft, 
   Trophy, 
   ExternalLink, 
   Shirt, 
   Footprints, 
-  Maximize2, 
   X, 
   Plus, 
   Trash2, 
   Save, 
   Download, 
-  AlertTriangle, 
   Briefcase, 
   Gem, 
   Check, 
-  Image as ImageIcon, 
   Ruler,
-  ChevronDown,
   Info,
-  Share2,
-  Eye,
-  MessageCircle
+  MessageCircle,
+  Layers,
+  Box
 } from 'lucide-react';
 
 import { initializeApp } from 'firebase/app';
 import { 
   getAuth, 
   signInAnonymously, 
-  signInWithCustomToken, 
   onAuthStateChanged,
   Auth
 } from 'firebase/auth';
@@ -40,29 +34,19 @@ import {
   doc, 
   setDoc, 
   getDoc, 
-  collection,
-  addDoc,
-  getDocs,
-  query,
-  orderBy,
-  limit,
-  serverTimestamp,
   Firestore 
 } from 'firebase/firestore';
 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-// --- Global Declarations for External Variables ---
+// --- Global Declarations ---
 declare const __app_id: string;
 declare const __firebase_config: string;
-declare const __initial_auth_token: string;
 
-// --- Configurações de Contato ---
 const WHATSAPP_NUMBER = "5516991679072"; 
 const WHATSAPP_MESSAGE = "Olá! Acabei de gerar meu orçamento no simulador D'sportivo uniformes e estou entrando em contato para enviar o PDF e finalizar meu pedido.";
 
-// --- Constantes de Preços ---
 const PRICES = {
   prata: { camisa: 42.90, calcao: 32.00, conjunto: 74.90, meiao: 20.00 },
   ouro: { camisa: 44.90, calcao: 35.00, conjunto: 79.90, meiao: 25.00 },
@@ -70,7 +54,24 @@ const PRICES = {
   empresarial: { camisa: 49.90, calcao: 35.00, conjunto: 84.90, meiao: 20.00 },
 };
 
-// --- Dados da Tabela de Medidas ---
+const EMBROIDERY_PRICE_PRATA = 5.00;
+
+const PRICES_DIVERSOS: Record<string, number> = {
+  colete: 25.00,
+  basquete: 55.00,
+  jaqueta: 98.00,
+  calca: 75.00,
+  regata: 39.90
+};
+
+const DIVERSOS_LABELS: Record<string, string> = {
+  colete: 'Colete',
+  basquete: 'Regata Basquete',
+  jaqueta: 'Jaqueta',
+  calca: 'Calça',
+  regata: 'Regata'
+};
+
 const SIZE_TABLES = {
   standard: {
     masculina: {
@@ -139,7 +140,7 @@ const SIZE_TABLES = {
         { t: 'XG', h: '65cm', w: '58cm' },
         { t: 'GG', h: '63cm', w: '56cm' },
         { t: 'G', h: '63cm', w: '53cm' },
-        { t: 'M', h: '50cm', w: '61cm' },
+        { t: 'M', h: '61cm', w: '50cm' },
         { t: 'P', h: '57cm', w: '48cm' },
       ]
     },
@@ -165,19 +166,19 @@ const SIZE_TABLES = {
 const LINE_DETAILS = {
   prata: { 
     name: 'Prata', 
-    priceDesc: 'Camisa R$ 42,90 (Bordado Opcional) | Calção R$ 32,00',
+    priceDesc: '', // Removida escrita suspensa
     desc: 'Excelente custo-benefício. Ideal para quem busca economia.', 
-    fullDesc: 'A Linha Prata (Monaco) é focada em times amadores e interclasses. Bordado é opcional nesta categoria.',
-    features: ['Tecido Dry Leve', 'Modelagem Padrão', 'Bordado Opcional', 'Proteção UV Básica'],
+    fullDesc: 'A Linha Prata (Monaco) é focada em times amadores e interclasses. Bordado é opcional com acréscimo de R$ 5,00 nas camisas.',
+    features: ['Tecido Dry Leve', 'Modelagem Padrão', 'Bordado Opcional (+R$ 5)', 'Proteção UV Básica'],
     color: 'bg-gray-400',
     textColor: 'text-gray-600',
     icon: Trophy
   },
   ouro: { 
     name: 'Ouro', 
-    priceDesc: 'Camisa R$ 44,90 (Bordado Incluso) | Calção R$ 35,00',
+    priceDesc: '', // Removida escrita suspensa
     desc: 'Tecido premium com acabamento superior.', 
-    fullDesc: 'A Linha Ouro (Bélgica) oferece tecido Dry Tech de maior gramatura with bordado já incluso no valor.',
+    fullDesc: 'A Linha Ouro (Bélgica) oferece tecido Dry Tech de maior gramatura with bordado já incluso na camisa.',
     features: ['Tecido Premium', 'Costura Dupla', 'Bordado Incluso', 'Alta Durabilidade'],
     color: 'bg-yellow-500',
     textColor: 'text-yellow-600',
@@ -185,7 +186,7 @@ const LINE_DETAILS = {
   },
   diamante: { 
     name: 'Diamante', 
-    priceDesc: 'Camisa R$ 74,90 (Bordado Incluso) | Calção R$ 49,90',
+    priceDesc: '', // Removida escrita suspensa
     desc: 'Modelagem profissional e exclusiva.', 
     fullDesc: 'A Linha Diamante (Vanilha/Polo) é o topo de linha para atletas exigentes. Inclui bordado de alta definição.',
     features: ['Slim Fit Profissional', 'Tecido Aero', 'Bordado Incluso', 'Golas Especiais'],
@@ -195,10 +196,10 @@ const LINE_DETAILS = {
   },
   empresarial: { 
     name: 'Empresarial / Eventos', 
-    priceDesc: 'Camisa R$ 49,90',
+    priceDesc: '', // Removida escrita suspensa
     desc: 'Solução ideal para uniformização de equipes e eventos.', 
-    fullDesc: 'Desenvolvida para empresas, eventos corporativos e atléticas.',
-    features: ['Unissex Versátil', 'Tecido Antipilling', 'Fácil Lavagem'],
+    fullDesc: 'Desenvolvida para empresas e eventos corporativos. Linha focada em praticidade, não trabalha com bordado.',
+    features: ['Unissex Versátil', 'Tecido Antipilling', 'Fácil Lavagem', 'Sem Bordado'],
     color: 'bg-slate-800',
     textColor: 'text-slate-700',
     icon: Briefcase
@@ -211,7 +212,7 @@ const KIT_TYPES: Record<string, string> = {
   comissao: 'Comissão Técnica',
   atleta: 'Atleta',
   torcida: 'Torcida',
-  staff: 'Staff / Eventos',
+  staff: 'Staff / Eventos'
 };
 
 const SOCK_COLORS = ['Preto', 'Branco', 'Azul Marinho', 'Azul Royal', 'Verde Bandeira', 'Vermelho', 'Amarelo Ouro'];
@@ -220,29 +221,55 @@ const SIZES_ADULTO = ['P', 'M', 'G', 'GG', 'XG', 'ESP', 'G3'];
 const SIZES_FEMININO = ['P BL', 'M BL', 'G BL', 'GG BL', 'XG BL', 'ESP BL'];
 const ALL_SIZES = [...SIZES_INFANTIL, ...SIZES_ADULTO, ...SIZES_FEMININO];
 
-interface SockItem { id: number; color: string; quantity: number; }
-interface RosterItem { name: string; number: string; size: string; type: 'conjunto' | 'camisa' | 'calcao'; kitType: keyof typeof KIT_TYPES; }
-interface CustomerInfo { customerName: string; customerPhone: string; }
 type LineType = 'prata' | 'ouro' | 'diamante' | 'empresarial';
+type ProductType = 'conjunto' | 'camisa' | 'calcao';
+
+interface SockItem { id: number; color: string; quantity: number; }
+interface DiversosItem { id: number; type: string; quantity: number; }
+interface RosterItem { 
+  name: string; 
+  number: string; 
+  size: string; 
+  type: ProductType; 
+  kitType: string;
+  productName?: string; 
+}
+
+interface CategoryQuantities {
+  conjunto: number;
+  camisa: number;
+  calcao: number;
+}
 
 interface Config { 
   line: LineType; 
-  kitLines: Record<keyof typeof KIT_TYPES, LineType>; 
-  kitQuantities: Record<keyof typeof KIT_TYPES, number>; 
-  kitEmbroidery: Record<keyof typeof KIT_TYPES, boolean>; 
+  kitLines: Record<string, LineType>; 
+  kitQuantities: Record<string, CategoryQuantities>; 
+  kitEmbroidery: Record<string, boolean>; 
   socks: SockItem[]; 
+  diversosItems: DiversosItem[];
   nextSockId: number; 
-  customerInfo: CustomerInfo; 
+  nextDiversosId: number;
+  customerInfo: { customerName: string; customerPhone: string; };
 }
 
 const INITIAL_CONFIG: Config = {
     line: 'prata',
     kitLines: { linha: 'prata', goleiro: 'prata', comissao: 'prata', atleta: 'prata', torcida: 'prata', staff: 'prata' },
-    kitQuantities: { linha: 10, atleta: 0, goleiro: 0, comissao: 0, torcida: 0, staff: 0 },
+    kitQuantities: { 
+      linha: { conjunto: 10, camisa: 0, calcao: 0 },
+      goleiro: { conjunto: 0, camisa: 0, calcao: 0 },
+      comissao: { conjunto: 0, camisa: 0, calcao: 0 },
+      atleta: { conjunto: 0, camisa: 0, calcao: 0 },
+      torcida: { conjunto: 0, camisa: 0, calcao: 0 },
+      staff: { conjunto: 0, camisa: 0, calcao: 0 }
+    },
     kitEmbroidery: { linha: false, goleiro: false, comissao: false, atleta: false, torcida: false, staff: false },
     socks: [],
+    diversosItems: [],
     nextSockId: 1,
-    customerInfo: { customerName: '', customerPhone: '' },
+    nextDiversosId: 1,
+    customerInfo: { customerName: '', customerPhone: '' }
 };
 
 const BrandLogo = () => (
@@ -284,7 +311,6 @@ const SizeTable = ({ title, headerColor, headers, keys, data }: any) => (
 
 export default function LandingPage() {
   const [db, setDb] = useState<Firestore | null>(null);
-  const [auth, setAuth] = useState<Auth | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [step, setStep] = useState(1);
@@ -292,72 +318,37 @@ export default function LandingPage() {
   const [config, setConfig] = useState<Config>(INITIAL_CONFIG);
   const [roster, setRoster] = useState<RosterItem[]>([]);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const [publicGallery, setPublicGallery] = useState<any[]>([]);
-  const [sharingStatus, setSharingStatus] = useState<Record<string, 'idle'|'sharing'|'shared'>>({});
-  const [selectedInspiration, setSelectedInspiration] = useState<string | null>(null);
-  const [hasReviewed, setHasReviewed] = useState(false);
   const [showSizeChart, setShowSizeChart] = useState(false);
   const [activeSizeTab, setActiveSizeTab] = useState<'standard' | 'diamond'>('standard');
+  const [hasReviewed, setHasReviewed] = useState(false);
 
-  const [designFiles, setDesignFiles] = useState<Record<keyof typeof KIT_TYPES, string | null>>({
-    linha: null, goleiro: null, comissao: null, atleta: null, torcida: null, staff: null,
+  const [designFiles, setDesignFiles] = useState<Record<string, string | null>>({
+    linha: null, goleiro: null, comissao: null, atleta: null, torcida: null, staff: null
   });
 
   useEffect(() => {
-    const appId = typeof __app_id !== 'undefined' ? String(__app_id as any) : 'default-app-id';
     const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? String(__firebase_config as any) : '{}');
     if (Object.keys(firebaseConfig).length === 0) { setIsLoading(false); return; }
     try {
       const app = initializeApp(firebaseConfig);
-      const newAuth = getAuth(app);
-      const newDb = getFirestore(app);
-      setAuth(newAuth);
-      setDb(newDb);
-      onAuthStateChanged(newAuth, async (user) => {
+      const auth = getAuth(app);
+      const dbInstance = getFirestore(app);
+      setDb(dbInstance);
+      onAuthStateChanged(auth, async (user) => {
         if (user) {
           setUserId(user.uid);
-          loadProgress(newDb, user.uid, appId);
+          loadProgress(dbInstance, user.uid);
         } else {
-          const anonUser = await signInAnonymously(newAuth);
+          const anonUser = await signInAnonymously(auth);
           setUserId(anonUser.user.uid);
-          loadProgress(newDb, anonUser.user.uid, appId);
+          loadProgress(dbInstance, anonUser.user.uid);
         }
       });
-      fetchPublicGallery(newDb, appId);
     } catch (e) { setIsLoading(false); }
   }, []);
 
-  const fetchPublicGallery = async (dbInstance: Firestore, appId: string) => {
-    try {
-      const q = query(collection(dbInstance, `artifacts/${appId}/public_gallery`), orderBy('createdAt', 'desc'), limit(12));
-      const querySnapshot = await getDocs(q);
-      const items = querySnapshot.docs.map(doc => doc.data());
-      setPublicGallery(items);
-    } catch (e) { console.error("Erro ao buscar galeria:", e); }
-  };
-
-  const shareToGallery = async (kitType: string) => {
+  const loadProgress = async (dbInstance: Firestore, uid: string) => {
     const appId = typeof __app_id !== 'undefined' ? String(__app_id as any) : 'default-app-id';
-    const image = designFiles[kitType as keyof typeof KIT_TYPES];
-    if (!image || !db) return;
-
-    setSharingStatus(prev => ({ ...prev, [kitType]: 'sharing' }));
-    try {
-      await addDoc(collection(db, `artifacts/${appId}/public_gallery`), {
-        image,
-        category: KIT_TYPES[kitType],
-        line: LINE_DETAILS[config.kitLines[kitType as keyof typeof KIT_TYPES]].name,
-        createdAt: serverTimestamp(),
-        author: config.customerInfo.customerName || 'Anônimo'
-      });
-      setSharingStatus(prev => ({ ...prev, [kitType]: 'shared' }));
-      fetchPublicGallery(db, appId);
-    } catch (e) {
-      setSharingStatus(prev => ({ ...prev, [kitType]: 'idle' }));
-    }
-  };
-
-  const loadProgress = async (dbInstance: Firestore, uid: string, appId: string) => {
     try {
       const docSnap = await getDoc(doc(dbInstance, `artifacts/${appId}/users/${uid}/orcamento`, 'draft'));
       if (docSnap.exists()) {
@@ -382,15 +373,31 @@ export default function LandingPage() {
     } catch (e) { setSaveStatus('error'); }
   };
 
-  const totalKits = useMemo(() => (Object.values(config.kitQuantities) as number[]).reduce((sum, q) => sum + q, 0), [config.kitQuantities]);
+  const totalKits = useMemo(() => {
+    return (Object.values(config.kitQuantities) as CategoryQuantities[]).reduce((sum, q) => sum + q.conjunto + q.camisa + q.calcao, 0);
+  }, [config.kitQuantities]);
+
   const totalSocks = useMemo(() => config.socks.reduce((sum, sock) => sum + sock.quantity, 0), [config.socks]);
   const minOrderMet = totalKits >= 10;
   
   const calculateTotal = () => {
     const rosterTotal = roster.reduce((acc, item) => {
+      if (item.kitType.startsWith('diversos_')) {
+        const divItem = config.diversosItems.find(di => `diversos_${di.id}` === item.kitType);
+        return acc + (PRICES_DIVERSOS[divItem?.type || ''] || 0);
+      }
+      
       const categoryLine = config.kitLines[item.kitType] || config.line; 
-      const itemPrice = PRICES[categoryLine][item.type as keyof typeof PRICES['prata']] || PRICES[categoryLine].conjunto;
-      return acc + itemPrice;
+      const productType = item.type;
+      const hasEmbroidery = config.kitEmbroidery[item.kitType];
+      
+      const basePrice = PRICES[categoryLine][productType];
+      
+      const isPrata = categoryLine === 'prata';
+      const isUpper = (productType === 'camisa' || productType === 'conjunto');
+      const embroideryExtra = (isPrata && hasEmbroidery && isUpper) ? EMBROIDERY_PRICE_PRATA : 0;
+      
+      return acc + basePrice + embroideryExtra;
     }, 0);
     return rosterTotal + (totalSocks * PRICES[config.line].meiao);
   };
@@ -406,6 +413,14 @@ export default function LandingPage() {
     }
   };
 
+  const addDiversosEntry = () => {
+    setConfig(prev => ({
+      ...prev,
+      diversosItems: [...prev.diversosItems, { id: prev.nextDiversosId, type: 'colete', quantity: 1 }],
+      nextDiversosId: prev.nextDiversosId + 1,
+    }));
+  };
+
   const updateSockEntry = (id: number, field: 'color' | 'quantity', value: string | number) => {
     setConfig(prev => ({
       ...prev,
@@ -417,6 +432,17 @@ export default function LandingPage() {
     }));
   };
 
+  const updateDiversosEntry = (id: number, field: 'type' | 'quantity', value: string | number) => {
+    setConfig(prev => ({
+      ...prev,
+      diversosItems: prev.diversosItems.map(item => 
+        item.id === id 
+          ? { ...item, [field]: field === 'quantity' ? Math.max(0, parseInt(String(value)) || 0) : value as string } 
+          : item
+      ),
+    }));
+  };
+
   const removeSockEntry = (id: number) => {
     setConfig(prev => ({
       ...prev,
@@ -424,20 +450,50 @@ export default function LandingPage() {
     }));
   };
 
+  const removeDiversosEntry = (id: number) => {
+    setConfig(prev => ({
+      ...prev,
+      diversosItems: prev.diversosItems.filter(item => item.id !== id),
+    }));
+  };
+
   useEffect(() => {
     setRoster(prev => {
       const newRoster: RosterItem[] = [];
-      const quantityMap = config.kitQuantities;
-      (Object.keys(KIT_TYPES) as Array<keyof typeof KIT_TYPES>).forEach(key => {
-        const count = quantityMap[key];
-        const existing = prev.filter(item => item.kitType === key);
-        for (let i = 0; i < count; i++) {
-          newRoster.push(existing[i] || { name: '', number: key === 'comissao' ? 'TÉC' : '', size: 'G', type: (key==='atleta'||key==='comissao'||key==='torcida') ? 'camisa' : 'conjunto', kitType: key });
+      (Object.keys(KIT_TYPES) as Array<string>).forEach(key => {
+        const q = config.kitQuantities[key];
+        (['conjunto', 'camisa', 'calcao'] as ProductType[]).forEach(pType => {
+          const count = q[pType];
+          const existingOfThisType = prev.filter(item => item.kitType === key && item.type === pType);
+          for (let i = 0; i < count; i++) {
+            newRoster.push(existingOfThisType[i] || { 
+              name: '', 
+              number: key === 'comissao' ? 'TÉC' : '', 
+              size: 'G', 
+              type: pType, 
+              kitType: key 
+            });
+          }
+        });
+      });
+
+      config.diversosItems.forEach(item => {
+        const key = `diversos_${item.id}`;
+        const existing = prev.filter(p => p.kitType === key);
+        for (let i = 0; i < item.quantity; i++) {
+          newRoster.push(existing[i] || {
+            name: '',
+            number: '',
+            size: 'G',
+            type: 'camisa',
+            kitType: key,
+            productName: DIVERSOS_LABELS[item.type]
+          });
         }
       });
       return newRoster;
     });
-  }, [config.kitQuantities]);
+  }, [config.kitQuantities, config.diversosItems]);
 
   const handleRosterChange = (index: number, field: string, value: string) => {
     const newRoster = [...roster];
@@ -445,24 +501,48 @@ export default function LandingPage() {
     setRoster(newRoster);
   };
 
-  const updateKitLine = (kitType: keyof typeof KIT_TYPES, lineKey: LineType) => {
-    setConfig(prev => ({ ...prev, kitLines: { ...prev.kitLines, [kitType]: lineKey } }));
+  const updateKitLine = (kitType: string, lineKey: LineType) => {
+    const isIncluded = ['ouro', 'diamante'].includes(lineKey);
+    const shouldDisable = lineKey === 'empresarial';
+    
+    setConfig(prev => ({ 
+      ...prev, 
+      kitLines: { ...prev.kitLines, [kitType]: lineKey },
+      kitEmbroidery: { 
+        ...prev.kitEmbroidery, 
+        [kitType]: shouldDisable ? false : (isIncluded ? true : prev.kitEmbroidery[kitType]) 
+      }
+    }));
   };
 
-  const toggleEmbroidery = (kitType: keyof typeof KIT_TYPES) => {
+  const updateCategoryQuantity = (kitType: string, type: ProductType, value: number) => {
+    setConfig(prev => ({
+      ...prev,
+      kitQuantities: {
+        ...prev.kitQuantities,
+        [kitType]: {
+          ...prev.kitQuantities[kitType],
+          [type]: Math.max(0, value)
+        }
+      }
+    }));
+  };
+
+  const toggleEmbroidery = (kitType: string) => {
+    const currentLine = config.kitLines[kitType];
+    if (currentLine !== 'prata') return; 
     setConfig(prev => ({
       ...prev,
       kitEmbroidery: { ...prev.kitEmbroidery, [kitType]: !prev.kitEmbroidery[kitType] }
     }));
   };
 
-  const handleDesignUpload = (kitType: keyof typeof KIT_TYPES, e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDesignUpload = (key: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-          setDesignFiles(prev => ({ ...prev, [kitType]: String(reader.result) }));
-          setSharingStatus(prev => ({ ...prev, [kitType]: 'idle' }));
+          setDesignFiles(prev => ({ ...prev, [key]: String(reader.result) }));
       };
       reader.readAsDataURL(file);
     }
@@ -475,17 +555,30 @@ export default function LandingPage() {
     doc.setTextColor(30, 58, 138);
     doc.text("D'sportivo uniformes", 14, 20);
     doc.line(14, 25, pageWidth - 14, 25);
+    
+    const tableBody: any[] = [];
+    (Object.entries(config.kitQuantities) as [string, CategoryQuantities][]).forEach(([k, q]) => {
+      const quantities = q;
+      (['conjunto', 'camisa', 'calcao'] as ProductType[]).forEach(type => {
+        if (quantities[type] > 0) {
+          tableBody.push([
+            KIT_TYPES[k],
+            `${LINE_DETAILS[config.kitLines[k]].name} (${type})`,
+            `${quantities[type]} un`,
+            config.kitEmbroidery[k] && type !== 'calcao' ? 'Com Bordado' : 'Sem Bordado'
+          ]);
+        }
+      });
+    });
+
+    config.diversosItems.forEach(item => {
+      tableBody.push(["Adicional", DIVERSOS_LABELS[item.type], `${item.quantity} un`, ""]);
+    });
+
     autoTable(doc, {
         startY: 35,
-        head: [['Categoria', 'Linha', 'Quantidade', 'Obs']],
-        body: Object.entries(config.kitQuantities)
-          .filter(([_, q]) => (q as number) > 0)
-          .map(([k, q]) => [
-            KIT_TYPES[k], 
-            LINE_DETAILS[config.kitLines[k as keyof typeof KIT_TYPES]].name, 
-            `${q} un`,
-            config.kitLines[k as keyof typeof KIT_TYPES] === 'prata' && config.kitEmbroidery[k as keyof typeof KIT_TYPES] ? 'Com Bordado' : ''
-          ])
+        head: [['Categoria', 'Linha / Produto', 'Quantidade', 'Obs']],
+        body: tableBody
     });
     doc.save(`Orcamento_Dsportivo.pdf`);
   };
@@ -495,45 +588,74 @@ export default function LandingPage() {
     window.open(url, '_blank');
   };
 
-  const CategoryControl = ({ kitType }: { kitType: keyof typeof KIT_TYPES }) => {
+  const CategoryControl: React.FC<{ kitType: string }> = ({ kitType }) => {
       const currentLine = config.kitLines[kitType];
-      const quantity = config.kitQuantities[kitType];
+      const qs = config.kitQuantities[kitType];
       const hasEmbroidery = config.kitEmbroidery[kitType];
+      
+      const isAllowedCategory = ['linha', 'goleiro', 'comissao', 'atleta', 'torcida'].includes(kitType);
+      const isEmbroideryIncluded = ['ouro', 'diamante'].includes(currentLine);
+      const isBusinessLine = currentLine === 'empresarial';
+
+      const showEmbroideryUI = isAllowedCategory && !isBusinessLine && (qs.conjunto > 0 || qs.camisa > 0);
+
+      const renderQtyRow = (type: ProductType, label: string) => {
+        const unitPrice = PRICES[currentLine][type];
+        const isUpper = type === 'conjunto' || type === 'camisa';
+        const finalPrice = unitPrice + (isUpper && currentLine === 'prata' && hasEmbroidery ? EMBROIDERY_PRICE_PRATA : 0);
+
+        return (
+          <div className="flex items-center justify-between bg-gray-50/50 p-2 rounded-xl border border-gray-100 mb-2">
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black uppercase text-gray-400 leading-none mb-1">{label}</span>
+              <span className="text-xs font-bold text-indigo-600">R$ {finalPrice.toFixed(2)}</span>
+            </div>
+            <div className="flex items-center gap-3">
+                <button onClick={() => updateCategoryQuantity(kitType, type, qs[type] - 1)} className="w-8 h-8 rounded-lg bg-white text-gray-500 font-black border border-gray-200 shadow-sm hover:text-indigo-600 active:scale-90 transition-all">-</button>
+                <input type="number" value={qs[type]} onChange={(e) => updateCategoryQuantity(kitType, type, parseInt(e.target.value) || 0)} className="w-8 text-center text-sm font-black bg-transparent focus:outline-none text-indigo-900" />
+                <button onClick={() => updateCategoryQuantity(kitType, type, qs[type] + 1)} className="w-8 h-8 rounded-lg bg-white text-gray-500 font-black border border-gray-200 shadow-sm hover:text-indigo-600 active:scale-90 transition-all">+</button>
+            </div>
+          </div>
+        );
+      };
 
       return (
-        <div className="bg-white rounded-2xl p-4 border border-indigo-100 shadow-sm flex flex-col gap-3 relative overflow-hidden group">
-            <div className={`absolute top-0 left-0 w-1 h-full ${LINE_DETAILS[currentLine].color}`}></div>
+        <div className="bg-white rounded-[2rem] p-5 border border-indigo-50 shadow-sm flex flex-col gap-4 relative overflow-hidden group hover:shadow-md transition-all">
+            <div className={`absolute top-0 left-0 w-1.5 h-full ${LINE_DETAILS[currentLine].color}`}></div>
             <div className="flex justify-between items-start pl-3">
-                <label className="block text-lg font-bold text-gray-900">{KIT_TYPES[kitType]}</label>
-                <span className="text-lg font-bold text-gray-900">R$ {PRICES[currentLine].conjunto.toFixed(2)}</span>
-            </div>
-            <div className="pl-3 grid grid-cols-1 gap-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
-                  <select value={currentLine} onChange={(e) => updateKitLine(kitType, e.target.value as LineType)} className="w-full bg-gray-50 border border-gray-300 py-2 px-3 rounded-lg text-sm font-medium">
+                <div className="flex flex-col">
+                  <label className="block text-xl font-black text-gray-900 leading-tight tracking-tighter uppercase italic">{KIT_TYPES[kitType]}</label>
+                  <select 
+                    value={currentLine} 
+                    onChange={(e) => updateKitLine(kitType, e.target.value as LineType)} 
+                    className="mt-1 bg-transparent border-none p-0 text-[10px] font-black uppercase text-indigo-600 cursor-pointer focus:ring-0 outline-none"
+                  >
                       {Object.keys(LINE_DETAILS).map((key) => (<option key={key} value={key}>Linha {LINE_DETAILS[key as LineType].name}</option>))}
                   </select>
-                  <div className="flex items-center justify-end gap-2">
-                      <button onClick={() => setConfig(prev => ({ ...prev, kitQuantities: { ...prev.kitQuantities, [kitType]: Math.max(0, prev.kitQuantities[kitType] - 1) } }))} className="w-8 h-8 rounded-md bg-gray-100 text-indigo-600 font-bold border border-gray-200">-</button>
-                      <input type="number" value={quantity} onChange={(e) => setConfig(prev => ({ ...prev, kitQuantities: { ...prev.kitQuantities, [kitType]: Math.max(0, parseInt(e.target.value) || 0) } }))} className="w-12 text-center text-lg font-bold bg-transparent border-b-2 border-indigo-200 focus:outline-none text-indigo-900" />
-                      <button onClick={() => setConfig(prev => ({ ...prev, kitQuantities: { ...prev.kitQuantities, [kitType]: prev.kitQuantities[kitType] + 1 } }))} className="w-8 h-8 rounded-md bg-gray-100 text-indigo-600 font-bold border border-gray-200">+</button>
-                  </div>
                 </div>
-
-                {/* Opção de Bordado para Linha Prata */}
-                {currentLine === 'prata' && quantity > 0 && (
-                  <div className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${hasEmbroidery ? 'bg-indigo-50 border-indigo-200 shadow-inner' : 'bg-gray-50 border-gray-200'}`}>
-                    <div className="relative flex items-center">
-                      <input 
-                        type="checkbox" 
-                        id={`embroidery-${kitType}`}
-                        checked={hasEmbroidery}
-                        onChange={() => toggleEmbroidery(kitType)}
-                        className="w-5 h-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                      />
-                    </div>
-                    <label htmlFor={`embroidery-${kitType}`} className="flex-1 cursor-pointer select-none">
-                      <span className="block text-xs font-bold text-indigo-900 uppercase">Bordado no peito</span>
-                      <span className="block text-[10px] text-gray-500 font-medium">Localizado no escudo da camisa</span>
+                <div className="text-right flex flex-col items-end">
+                   <Box size={24} className="text-gray-100 group-hover:text-indigo-100 transition-colors" />
+                </div>
+            </div>
+            <div className="pl-3 space-y-1">
+                {renderQtyRow('conjunto', 'Kit Completo')}
+                {renderQtyRow('camisa', 'Só Camisa')}
+                {renderQtyRow('calcao', 'Só Calção')}
+                {showEmbroideryUI && (
+                  <div className={`mt-2 flex items-center gap-3 p-3 rounded-2xl border transition-all ${isEmbroideryIncluded || hasEmbroidery ? 'bg-indigo-50 border-indigo-200' : 'bg-gray-50 border-gray-200'}`}>
+                    <input 
+                      type="checkbox" 
+                      id={`embroidery-${kitType}`}
+                      disabled={isEmbroideryIncluded}
+                      checked={isEmbroideryIncluded || hasEmbroidery}
+                      onChange={() => toggleEmbroidery(kitType)}
+                      className="w-5 h-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 accent-indigo-600"
+                    />
+                    <label htmlFor={`embroidery-${kitType}`} className="flex-1 cursor-pointer">
+                      <span className="block text-[10px] font-black text-indigo-900 uppercase">Adicionar Bordado (Opcional)</span>
+                      <span className="block text-[9px] text-gray-500 font-medium">
+                        {isEmbroideryIncluded ? 'Escudo já incluso no valor' : 'Acrescenta R$ 5,00 por Camisa/Kit'}
+                      </span>
                     </label>
                   </div>
                 )}
@@ -545,69 +667,36 @@ export default function LandingPage() {
   const renderStep1 = () => (
     <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="text-center space-y-4 pt-4">
-        <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 tracking-tight">Vista seu time com <span className="text-indigo-600">Excelência</span></h1>
-        <p className="text-lg text-gray-600 max-w-2xl mx-auto leading-relaxed">Simulador de orçamentos para uniformes esportivos profissionais.</p>
+        <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 tracking-tight">Qualidade <span className="text-indigo-600">D'sportivo</span></h1>
+        <p className="text-lg text-gray-600 max-w-2xl mx-auto leading-relaxed">Escolha a linha base para começar sua simulação profissional.</p>
       </div>
-
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 px-2">
         {(Object.keys(LINE_DETAILS) as Array<keyof typeof LINE_DETAILS>).map((key) => (
-          <div key={key} className="bg-white border border-gray-200 rounded-2xl overflow-hidden hover:shadow-xl transition-all p-6 flex flex-col">
+          <div key={key} className="bg-white border border-gray-200 rounded-2xl overflow-hidden hover:shadow-xl transition-all p-6 flex flex-col group">
               <div className="flex items-center gap-4 mb-4">
-                  <div className={`w-12 h-12 rounded-full ${LINE_DETAILS[key].color} text-white flex items-center justify-center shadow-md`}><Trophy size={24} /></div>
-                  <div><h3 className="text-xl font-bold text-gray-900">{LINE_DETAILS[key].name}</h3><p className="text-sm font-medium text-indigo-600">{LINE_DETAILS[key].priceDesc}</p></div>
+                  <div className={`w-12 h-12 rounded-full ${LINE_DETAILS[key].color} text-white flex items-center justify-center shadow-md group-hover:rotate-6 transition-transform`}><Trophy size={24} /></div>
+                  <div><h3 className="text-xl font-bold text-gray-900">Linha {LINE_DETAILS[key].name}</h3></div>
               </div>
               <p className="text-gray-600 text-sm mb-6 flex-1">{LINE_DETAILS[key].desc}</p>
               <button onClick={() => setModalOpen(key)} className="w-full py-3 rounded-xl bg-gray-50 text-gray-700 font-bold border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-colors flex items-center justify-center gap-2"><Info size={18} /> Ver Detalhes</button>
           </div>
         ))}
       </div>
-
-      {/* GALERIA PÚBLICA */}
-      {publicGallery.length > 0 && (
-          <div className="pt-8 border-t border-gray-100">
-              <h2 className="text-2xl font-black text-gray-900 mb-6 flex items-center gap-2 px-2">
-                  <ImageIcon size={28} className="text-indigo-600" /> Inspirações da Comunidade
-              </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 px-2">
-                  {publicGallery.map((item, idx) => (
-                      <div key={idx} className="group relative aspect-square rounded-2xl overflow-hidden border border-gray-200 hover:border-indigo-500 cursor-pointer shadow-sm transition-all" onClick={() => setSelectedInspiration(item.image)}>
-                          <img src={item.image} className="w-full h-full object-cover" />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white p-2">
-                              <Eye size={24} />
-                              <span className="text-[10px] font-bold uppercase mt-1">{item.category}</span>
-                              <span className="text-[8px] opacity-80">{item.line}</span>
-                          </div>
-                      </div>
-                  ))}
-              </div>
-          </div>
-      )}
-
       <div className="flex justify-center pt-8 pb-4">
-        <button onClick={() => setStep(2)} className="px-10 py-5 rounded-2xl font-black text-lg flex items-center gap-3 bg-gray-900 text-white hover:bg-indigo-600 shadow-xl">INICIAR SIMULAÇÃO <ArrowRight size={24} /></button>
+        <button onClick={() => setStep(2)} className="px-10 py-5 rounded-2xl font-black text-lg flex items-center gap-3 bg-gray-900 text-white hover:bg-indigo-600 shadow-xl transition-transform active:scale-95 uppercase">INICIAR SIMULAÇÃO <ArrowRight size={24} /></button>
       </div>
-      
       {modalOpen && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={() => setModalOpen(null)}>
-              <div className="bg-white max-w-lg w-full rounded-2xl p-8" onClick={e => e.stopPropagation()}>
+              <div className="bg-white max-w-lg w-full rounded-2xl p-8 shadow-2xl animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
                   <div className="flex justify-between items-start mb-6">
                       <h3 className="text-3xl font-bold">Linha {LINE_DETAILS[modalOpen].name}</h3>
-                      <button onClick={() => setModalOpen(null)}><X size={24} /></button>
+                      <button onClick={() => setModalOpen(null)} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><X size={24} /></button>
                   </div>
                   <p className="text-gray-600 mb-6 leading-relaxed">{LINE_DETAILS[modalOpen].fullDesc}</p>
                   <ul className="space-y-3 mb-8">
-                      {LINE_DETAILS[modalOpen].features.map((f, i) => (<li key={i} className="flex items-center gap-2"><Check size={18} className="text-green-500" /> {f}</li>))}
+                      {LINE_DETAILS[modalOpen].features.map((f, i) => (<li key={i} className="flex items-center gap-2 font-medium text-gray-700"><Check size={18} className="text-green-500" /> {f}</li>))}
                   </ul>
-                  <button onClick={() => { setConfig(prev => ({ ...prev, line: modalOpen! })); setStep(2); setModalOpen(null); }} className="w-full py-4 bg-indigo-600 text-white font-bold rounded-xl shadow-lg">Escolher Linha {LINE_DETAILS[modalOpen].name}</button>
-              </div>
-          </div>
-      )}
-
-      {selectedInspiration && (
-          <div className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-4 cursor-zoom-out" onClick={() => setSelectedInspiration(null)}>
-              <div className="relative max-w-4xl w-full max-h-[90vh]">
-                  <img src={selectedInspiration} className="w-full h-full object-contain rounded-xl" />
-                  <button className="absolute -top-4 -right-4 bg-white rounded-full p-2" onClick={() => setSelectedInspiration(null)}><X size={24} /></button>
+                  <button onClick={() => { setConfig(prev => ({ ...prev, line: modalOpen! })); setStep(2); setModalOpen(null); }} className="w-full py-4 bg-indigo-600 text-white font-bold rounded-xl shadow-lg hover:bg-indigo-700 transition-colors">Escolher Linha {LINE_DETAILS[modalOpen].name}</button>
               </div>
           </div>
       )}
@@ -615,102 +704,79 @@ export default function LandingPage() {
   );
 
   const renderStep2 = () => (
-    <div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-500">
-      <h2 className="text-2xl font-bold text-center">Quantidades por Categoria</h2>
-      
-      {/* Categorias Principais */}
-      <div className="space-y-4">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4"><CategoryControl kitType="linha" /><CategoryControl kitType="goleiro" /></div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4"><CategoryControl kitType="comissao" /><CategoryControl kitType="atleta" /></div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4"><CategoryControl kitType="torcida" /><CategoryControl kitType="staff" /></div>
+    <div className="space-y-10 animate-in fade-in slide-in-from-right-8 duration-500">
+      <div className="text-center space-y-2">
+        <h2 className="text-3xl font-black text-gray-900 uppercase tracking-tighter italic">O Que Seu Time Precisa?</h2>
+        <p className="text-sm text-gray-500 font-medium">Defina os produtos e quantidades para cada grupo.</p>
       </div>
-
-      {/* SEÇÃO DE MEIÕES */}
-      <div className="bg-white rounded-2xl p-6 border border-gray-200 space-y-4 shadow-sm">
-          <h3 className="text-lg font-bold text-gray-700 flex items-center gap-2 mb-4">
-            <Footprints size={20} className="text-indigo-600" /> Meiões Avulsos (Múltiplas Cores)
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {Object.keys(KIT_TYPES).map(key => <CategoryControl key={key} kitType={key} />)}
+      </div>
+      <div className="bg-white rounded-[2.5rem] p-8 border border-orange-100 bg-orange-50/10 space-y-6 shadow-sm relative">
+          <div className="absolute top-0 right-0 p-6 opacity-10"><Layers size={80} className="text-orange-600" /></div>
+          <h3 className="text-xl font-black text-orange-800 flex items-center gap-3 uppercase tracking-widest">
+            <Layers size={24} className="text-orange-600" /> Adicionais / Diversos
           </h3>
-          
-          <div className="space-y-3">
-            {config.socks.map(sock => (
-              <div key={sock.id} className="flex items-center gap-4 bg-gray-50 p-3 rounded-xl border border-gray-100 shadow-sm">
-                
-                {/* Seleção de Cor */}
+          <div className="space-y-4">
+            {config.diversosItems.map(item => (
+              <div key={item.id} className="flex flex-col sm:flex-row sm:items-center gap-4 bg-white p-5 rounded-3xl border border-orange-100 shadow-sm relative overflow-hidden group">
+                <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-orange-400"></div>
                 <div className="flex-1">
-                  <select 
-                    value={sock.color}
-                    onChange={(e) => updateSockEntry(sock.id, 'color', e.target.value)}
-                    className="w-full h-10 rounded-lg bg-white border border-gray-300 text-gray-700 px-3 text-sm focus:ring-indigo-500 focus:border-indigo-500 font-medium"
-                  >
-                    {SOCK_COLORS.map(color => (
-                      <option 
-                        key={color} 
-                        value={color}
-                        disabled={config.socks.some(s => s.color === color && s.id !== sock.id)}
-                      >
-                        {color}
-                      </option>
-                    ))}
+                  <select value={item.type} onChange={(e) => updateDiversosEntry(item.id, 'type', e.target.value)} className="w-full h-12 rounded-2xl bg-gray-50 border border-gray-100 text-gray-700 px-5 text-sm font-bold outline-none focus:ring-2 focus:ring-orange-500">
+                    {Object.entries(DIVERSOS_LABELS).map(([val, label]) => (<option key={val} value={val}>{label}</option>))}
                   </select>
                 </div>
-
-                {/* Contador de Quantidade */}
-                <div className="flex items-center gap-2">
-                  <label className="text-xs font-bold text-gray-500 hidden sm:block">Pares:</label>
-                  <button 
-                    onClick={() => updateSockEntry(sock.id, 'quantity', sock.quantity - 1)}
-                    className="w-8 h-8 rounded-md bg-white text-gray-600 font-bold hover:bg-gray-100 border border-gray-200"
-                  >-</button>
-                  <input 
-                      type="number" 
-                      min="0"
-                      value={sock.quantity}
-                      onChange={(e) => updateSockEntry(sock.id, 'quantity', e.target.value)}
-                      className="w-10 text-center text-sm font-bold bg-transparent border-b border-gray-300 focus:outline-none text-indigo-900"
-                  />
-                  <button 
-                    onClick={() => updateSockEntry(sock.id, 'quantity', sock.quantity + 1)}
-                    className="w-8 h-8 rounded-md bg-white text-gray-600 font-bold hover:bg-gray-100 border border-gray-200"
-                  >+</button>
+                <div className="flex items-center justify-between sm:justify-end gap-8">
+                  <div className="text-right">
+                    <span className="text-xl font-black text-gray-800 block leading-none">R$ {PRICES_DIVERSOS[item.type].toFixed(2)}</span>
+                    <span className="text-[10px] font-bold text-gray-400 uppercase">Unitário</span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <button onClick={() => updateDiversosEntry(item.id, 'quantity', item.quantity - 1)} className="w-10 h-10 rounded-xl bg-gray-50 text-gray-500 font-black border border-gray-100 transition-all active:scale-90">-</button>
+                    <input type="number" value={item.quantity} onChange={(e) => updateDiversosEntry(item.id, 'quantity', parseInt(e.target.value) || 0)} className="w-10 text-center text-lg font-black bg-transparent focus:outline-none text-orange-900" />
+                    <button onClick={() => updateDiversosEntry(item.id, 'quantity', item.quantity + 1)} className="w-10 h-10 rounded-xl bg-gray-50 text-gray-500 font-black border border-gray-100 transition-all active:scale-90">+</button>
+                  </div>
+                  <button onClick={() => removeDiversosEntry(item.id)} className="p-3 rounded-2xl text-red-300 hover:text-red-500 hover:bg-red-50 transition-all"><Trash2 size={20} /></button>
                 </div>
-
-                {/* Remover */}
-                <button 
-                  onClick={() => removeSockEntry(sock.id)}
-                  className="p-2 rounded-full text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors"
-                >
-                  <Trash2 size={16} />
-                </button>
               </div>
             ))}
           </div>
-          
+          <button onClick={addDiversosEntry} className="w-full sm:w-auto text-orange-700 flex items-center justify-center gap-2 font-black text-[11px] bg-orange-100 px-8 py-4 rounded-2xl border border-orange-200 uppercase tracking-widest active:scale-95 shadow-sm">
+            <Plus size={18}/> Adicionar Outro Item
+          </button>
+      </div>
+      <div className="bg-white rounded-[2.5rem] p-8 border border-gray-200 space-y-6 shadow-sm">
+          <h3 className="text-xl font-black text-gray-700 flex items-center gap-3 uppercase tracking-widest">
+            <Footprints size={24} className="text-indigo-600" /> Meiões Profissionais
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {config.socks.map(sock => (
+              <div key={sock.id} className="flex items-center gap-4 bg-gray-50 p-4 rounded-3xl border border-gray-100">
+                <div className="flex-1">
+                  <select value={sock.color} onChange={(e) => updateSockEntry(sock.id, 'color', e.target.value)} className="w-full h-11 rounded-xl bg-white border border-gray-100 text-gray-700 px-4 text-sm font-bold">
+                    {SOCK_COLORS.map(color => (<option key={color} value={color} disabled={config.socks.some(s => s.color === color && s.id !== sock.id)}>{color}</option>))}
+                  </select>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => updateSockEntry(sock.id, 'quantity', sock.quantity - 1)} className="w-9 h-9 rounded-lg bg-white text-gray-400 font-black border border-gray-200">-</button>
+                  <span className="w-6 text-center text-sm font-black">{sock.quantity}</span>
+                  <button onClick={() => updateSockEntry(sock.id, 'quantity', sock.quantity + 1)} className="w-9 h-9 rounded-lg bg-white text-gray-400 font-black border border-gray-200">+</button>
+                </div>
+                <button onClick={() => removeSockEntry(sock.id)} className="p-2 text-red-300 hover:text-red-500 transition-colors"><Trash2 size={18} /></button>
+              </div>
+            ))}
+          </div>
           {SOCK_COLORS.length > config.socks.length && (
-            <button 
-              onClick={addSockEntry} 
-              className="mt-3 text-indigo-600 flex items-center gap-1 font-bold hover:text-indigo-800 transition-colors text-sm bg-indigo-50 px-4 py-2 rounded-lg"
-            >
-              <Plus size={16}/> ADICIONAR COR DE MEIÃO
-            </button>
-          )}
-
-          {totalSocks > 0 && (
-            <p className="text-xs font-bold text-gray-500 pt-2 flex items-center gap-1">
-              <CheckCircle2 size={14} className="text-green-500" /> Total de Meiões: {totalSocks} pares
-            </p>
+            <button onClick={addSockEntry} className="text-indigo-600 flex items-center gap-2 font-black text-[11px] bg-indigo-50 px-8 py-4 rounded-2xl border border-indigo-100 uppercase tracking-widest active:scale-95"><Plus size={16}/> Adicionar Cor</button>
           )}
       </div>
-
-      <div className="bg-indigo-50 p-4 rounded-xl text-center border border-indigo-100 font-bold text-indigo-900">
-        Total Kits Principais: {totalKits} {!minOrderMet && `(Mínimo 10. Faltam ${10-totalKits})`}
+      <div className={`p-6 rounded-[2rem] text-center border-2 border-dashed transition-all font-black uppercase tracking-tighter text-lg ${minOrderMet ? 'bg-indigo-50 border-indigo-200 text-indigo-900' : 'bg-red-50 border-red-200 text-red-900'}`}>
+        Total de Peças: {totalKits} {minOrderMet ? <Check size={20} className="inline ml-2" /> : <span className="block text-xs mt-1">(Mínimo 10 un. Faltam {10-totalKits})</span>}
       </div>
-
       <div className="flex justify-between pt-4">
-        <button onClick={() => setStep(1)} className="text-gray-500 font-medium flex items-center gap-2">
-          <ArrowLeft size={20} /> Voltar
-        </button>
-        <button onClick={() => setStep(3)} disabled={!minOrderMet} className={`px-8 py-4 rounded-xl font-bold text-white shadow-lg ${minOrderMet ? 'bg-gray-900 hover:bg-gray-800' : 'bg-gray-300 cursor-not-allowed'}`}>
-          Próximo <ArrowRight size={20} />
+        <button onClick={() => setStep(1)} className="text-gray-400 font-black flex items-center gap-2 uppercase text-xs tracking-widest"><ArrowLeft size={20} /> Voltar</button>
+        <button onClick={() => setStep(3)} disabled={!minOrderMet} className={`px-12 py-6 rounded-[2rem] font-black text-white shadow-2xl transition-all active:scale-95 uppercase tracking-widest ${minOrderMet ? 'bg-gray-900 hover:bg-gray-800' : 'bg-gray-300 cursor-not-allowed'}`}>
+          Próximo Passo <ArrowRight size={24} className="ml-2" />
         </button>
       </div>
     </div>
@@ -718,156 +784,154 @@ export default function LandingPage() {
 
   const renderStep3 = () => (
     <div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-500">
-      <div className="text-center"><h2 className="text-2xl font-bold">Anexar Modelo Visual</h2><p className="text-gray-500">Anexe um print ou arte para cada categoria.</p></div>
-      <div className="bg-indigo-100 p-4 rounded-xl flex justify-between items-center"><p className="text-indigo-900 font-medium">Use nosso simulador:</p><a href="https://www.dsportivo.com.br/simulador/" target="_blank" className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2">Abrir Simulador <ExternalLink size={16} /></a></div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {(Object.keys(KIT_TYPES) as Array<keyof typeof KIT_TYPES>).map((key) => {
-          if (config.kitQuantities[key] === 0) return null;
+      <div className="text-center"><h2 className="text-3xl font-black text-gray-900 uppercase tracking-tighter italic">Referências Visuais</h2><p className="text-sm text-gray-500 font-medium">Anexe artes ou prints do design desejado.</p></div>
+      <div className="bg-indigo-100 p-6 rounded-[2.5rem] flex flex-col md:flex-row justify-between items-center gap-6"><p className="text-indigo-900 font-bold text-center md:text-left">Use nosso simulador 3D para criar seu design antes de anexar:</p><a href="https://www.dsportivo.com.br/simulador/" target="_blank" className="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black flex items-center gap-3 hover:bg-indigo-700 transition-all shadow-lg active:scale-95 uppercase text-[10px] tracking-widest">Acessar Simulador <ExternalLink size={16} /></a></div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {(Object.keys(KIT_TYPES) as Array<string>).map((key) => {
+          const q = config.kitQuantities[key];
+          if (q.conjunto === 0 && q.camisa === 0 && q.calcao === 0) return null;
           const file = designFiles[key];
-          const status = sharingStatus[key] || 'idle';
           return (
-            <div key={key} className="border-2 border-dashed border-gray-300 rounded-3xl p-6 flex flex-col items-center group relative">
-              <input type="file" accept="image/*" onChange={(e) => handleDesignUpload(key, e)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-              <h3 className="text-lg font-bold mb-1">{KIT_TYPES[key]} ({config.kitQuantities[key]} un)</h3>
-              <p className="text-xs font-bold text-indigo-600 mb-4 bg-indigo-50 px-2 py-1 rounded">Linha: {LINE_DETAILS[config.kitLines[key]].name}</p>
+            <div key={key} className="border-2 border-dashed border-gray-200 rounded-[3rem] p-10 flex flex-col items-center group relative hover:border-indigo-400 transition-all bg-white shadow-sm hover:shadow-md">
+              <input type="file" accept="image/*" onChange={(e) => handleDesignUpload(key, e)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20" />
+              <h3 className="text-xl font-black text-gray-900 uppercase italic tracking-tighter mb-4">{KIT_TYPES[key]}</h3>
               {file ? (
-                <div className="w-full space-y-3 relative z-10 pointer-events-auto">
-                    <div className="w-full h-40 bg-gray-100 rounded-lg overflow-hidden"><img src={file} className="w-full h-full object-contain" /></div>
-                    <button 
-                        onClick={(e) => { e.stopPropagation(); shareToGallery(key); }}
-                        disabled={status !== 'idle'}
-                        className={`w-full py-2 rounded-lg font-bold flex items-center justify-center gap-2 text-xs transition-colors ${
-                            status === 'shared' ? 'bg-green-100 text-green-700' : 
-                            status === 'sharing' ? 'bg-yellow-100 text-yellow-700' : 
-                            'bg-indigo-600 text-white hover:bg-indigo-700'
-                        }`}
-                    >
-                        {status === 'shared' ? <><Check size={14} /> Compartilhado!</> : 
-                         status === 'sharing' ? 'Compartilhando...' : 
-                         <><Share2 size={14} /> Compartilhar na Galeria Pública</>}
-                    </button>
-                </div>
+                <div className="w-full h-60 bg-gray-50 rounded-[2rem] overflow-hidden relative z-10 p-4 border border-gray-100"><img src={file} className="w-full h-full object-contain" alt="Preview" /></div>
               ) : (
-                <div className="flex flex-col items-center py-6 text-gray-400"><Upload size={32} className="mb-2" /><span>Anexar Modelo</span></div>
+                <div className="flex flex-col items-center py-16 text-gray-400 group-hover:text-indigo-500 transition-colors"><Upload size={48} className="mb-4" /> <span className="text-[10px] font-black uppercase tracking-[0.2em]">Clique para Anexar Arte</span></div>
+              )}
+            </div>
+          );
+        })}
+        {config.diversosItems.map(item => {
+          const key = `diversos_${item.id}`;
+          const file = designFiles[key];
+          return (
+            <div key={key} className="border-2 border-dashed border-orange-200 bg-orange-50/5 rounded-[3rem] p-10 flex flex-col items-center group relative hover:border-orange-400 transition-all">
+              <input type="file" accept="image/*" onChange={(e) => handleDesignUpload(key, e)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20" />
+              <h3 className="text-xl font-black text-gray-900 uppercase italic mb-4">{DIVERSOS_LABELS[item.type]}</h3>
+              {file ? (
+                <div className="w-full h-60 bg-white rounded-[2rem] overflow-hidden relative z-10 p-4 border border-orange-100"><img src={file} className="w-full h-full object-contain" alt="Preview" /></div>
+              ) : (
+                <div className="flex flex-col items-center py-16 text-gray-400 group-hover:text-orange-400 transition-colors"><Upload size={48} className="mb-4" /> <span className="text-[10px] font-black uppercase tracking-[0.2em]">Anexar Modelo</span></div>
               )}
             </div>
           );
         })}
       </div>
-      <div className="flex justify-between pt-4"><button onClick={() => setStep(2)} className="text-gray-500 font-medium flex items-center gap-2"><ArrowLeft size={20} /> Voltar</button><button onClick={() => setStep(4)} className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg">Próximo <ArrowRight size={20} /></button></div>
+      <div className="flex justify-between pt-4"><button onClick={() => setStep(2)} className="text-gray-400 font-black uppercase text-xs tracking-widest"><ArrowLeft size={20} /> Voltar</button><button onClick={() => setStep(4)} className="bg-indigo-600 text-white px-12 py-6 rounded-[2rem] font-black shadow-2xl hover:bg-indigo-700 transition-all active:scale-95 uppercase tracking-widest">Revisar Pedido <ArrowRight size={24} className="ml-2" /></button></div>
     </div>
   );
 
   const renderStep4 = () => (
-    <div className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-500">
-        <h2 className="text-2xl font-bold">Formalização do Pedido</h2>
-        <div className="bg-white border border-indigo-200 rounded-xl p-4 space-y-4 shadow-sm">
-            <h3 className="font-bold text-indigo-800">Dados do Cliente</h3>
-            <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-                <input type="text" placeholder="Nome Completo" value={config.customerInfo.customerName} onChange={(e) => setConfig(prev => ({ ...prev, customerInfo: { ...prev.customerInfo, customerName: e.target.value } }))} className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-black focus:ring-2 focus:ring-indigo-500 outline-none placeholder-gray-400" />
-                <input type="tel" placeholder="Telefone" value={config.customerInfo.customerPhone} onChange={(e) => setConfig(prev => ({ ...prev, customerInfo: { ...prev.customerInfo, customerPhone: e.target.value } }))} className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-black focus:ring-2 focus:ring-indigo-500 outline-none placeholder-gray-400" />
+    <div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-500">
+        <div className="text-center space-y-2">
+          <h2 className="text-3xl font-black text-gray-900 uppercase tracking-tighter italic">Quase Lá!</h2>
+          <p className="text-sm text-gray-500 font-medium">Preencha sua grade e dados de contato para o orçamento final.</p>
+        </div>
+        
+        <div className="bg-white border-2 border-indigo-100 rounded-[2.5rem] p-8 space-y-6 shadow-sm">
+            <h3 className="font-black text-indigo-900 uppercase text-xs tracking-[0.2em]">Seus Dados</h3>
+            <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
+                <input type="text" placeholder="Responsável pelo Time" value={config.customerInfo.customerName} onChange={(e) => setConfig(prev => ({ ...prev, customerInfo: { ...prev.customerInfo, customerName: e.target.value } }))} className="w-full px-6 py-5 border-2 border-gray-100 rounded-3xl bg-gray-50 text-gray-900 font-bold focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all" />
+                <input type="tel" placeholder="WhatsApp" value={config.customerInfo.customerPhone} onChange={(e) => setConfig(prev => ({ ...prev, customerInfo: { ...prev.customerInfo, customerPhone: e.target.value } }))} className="w-full px-6 py-5 border-2 border-gray-100 rounded-3xl bg-gray-50 text-gray-900 font-bold focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all" />
             </div>
         </div>
-        <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left"><thead className="bg-gray-50 text-gray-600 text-xs"><tr><th className="px-4 py-3">#</th><th className="px-4 py-3">Nome</th><th className="px-4 py-3">Nº</th><th className="px-4 py-3">Tam.</th><th className="px-4 py-3">Item</th></tr></thead>
-                <tbody className="divide-y divide-gray-100">
-                    {roster.map((player, index) => (
-                        <tr key={index} className="hover:bg-gray-50">
-                            <td className="px-4 py-3 text-gray-400">{index+1}</td>
-                            <td className="px-4 py-2">
-                                <input 
-                                  type="text" 
-                                  value={player.name} 
-                                  onChange={(e) => handleRosterChange(index, 'name', e.target.value)} 
-                                  className="w-full px-2 py-1 bg-white text-black border border-gray-200 rounded focus:border-indigo-500 outline-none" 
-                                />
-                            </td>
-                            <td className="px-4 py-2">
-                                <input 
-                                  type="text" 
-                                  value={player.number} 
-                                  onChange={(e) => handleRosterChange(index, 'number', e.target.value)} 
-                                  className="w-full text-center px-1 py-1 bg-white text-black border border-gray-200 rounded focus:border-indigo-500 outline-none" 
-                                />
-                            </td>
-                            <td className="px-4 py-2">
-                                <select 
-                                  value={player.size} 
-                                  onChange={(e) => handleRosterChange(index, 'size', e.target.value)} 
-                                  className="w-full bg-white text-black border border-gray-200 rounded px-1 py-1 focus:border-indigo-500 outline-none"
-                                >
-                                    {ALL_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
-                                </select>
-                            </td>
-                            <td className="px-4 py-2">
-                                <select 
-                                  value={player.type} 
-                                  onChange={(e) => handleRosterChange(index, 'type', e.target.value)} 
-                                  className="w-full text-xs font-bold text-black bg-white border border-gray-200 px-2 py-1 rounded focus:border-indigo-500 outline-none"
-                                >
-                                    <option value="conjunto">Conjunto</option>
-                                    <option value="camisa">Só Camisa</option>
-                                    <option value="calcao">Só Calção</option>
-                                </select>
-                            </td>
-                        </tr>
-                    ))}
-                </tbody></table>
-            </div>
-        </div>
-        <div className="bg-gray-900 text-white rounded-2xl p-6 space-y-4 shadow-xl">
-            <div className="text-3xl font-bold text-green-400">R$ {calculateTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
-            <div className="bg-amber-50 p-4 rounded-xl flex items-start gap-3 text-amber-900 text-sm">
-                <input type="checkbox" checked={hasReviewed} onChange={(e) => setHasReviewed(e.target.checked)} className="w-5 h-5 mt-0.5" id="rev" />
-                <label htmlFor="rev" className="cursor-pointer">Revisei todos os dados e assumo a responsabilidade por nomes/números/tamanhos.</label>
-            </div>
-            
-            <div className="space-y-3">
-              <button 
-                onClick={handleDownload} 
-                disabled={!hasReviewed || !config.customerInfo.customerName} 
-                className={`w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${hasReviewed && config.customerInfo.customerName ? 'bg-indigo-600 hover:bg-indigo-700 active:scale-95' : 'bg-gray-600 opacity-50 cursor-not-allowed'}`}
-              >
-                <Download size={20} /> Baixar Orçamento PDF
-              </button>
 
-              <button 
-                onClick={handleWhatsAppContact} 
-                disabled={!hasReviewed || !config.customerInfo.customerName} 
-                className={`w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${hasReviewed && config.customerInfo.customerName ? 'bg-green-600 hover:bg-green-700 active:scale-95' : 'bg-gray-600 opacity-50 cursor-not-allowed'}`}
-              >
-                <MessageCircle size={20} /> Enviar Orçamento no WhatsApp
+        <div className="bg-white border border-gray-200 rounded-[2.5rem] shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-gray-50 text-gray-400 text-[10px] font-black uppercase tracking-[0.2em] border-b border-gray-100">
+                    <tr><th className="px-8 py-6">#</th><th className="px-8 py-6">Grade do Time</th><th className="px-8 py-6">Nº</th><th className="px-8 py-6">Tamanho</th><th className="px-8 py-6">Peça</th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                      {roster.map((player, index) => (
+                          <tr key={index} className="hover:bg-gray-50/50 transition-colors">
+                              <td className="px-8 py-4 text-gray-200 font-black italic">{index+1}</td>
+                              <td className="px-8 py-2"><input type="text" value={player.name} onChange={(e) => handleRosterChange(index, 'name', e.target.value)} className="w-full px-5 py-3 bg-white text-gray-900 border-2 border-gray-100 rounded-2xl font-bold focus:border-indigo-500 outline-none shadow-sm" placeholder="Nome na peça..." /></td>
+                              <td className="px-8 py-2"><input type="text" value={player.number} onChange={(e) => handleRosterChange(index, 'number', e.target.value)} className="w-full text-center px-1 py-3 bg-white text-gray-900 border-2 border-gray-100 rounded-2xl font-bold focus:border-indigo-500 outline-none shadow-sm" placeholder="--" /></td>
+                              <td className="px-8 py-2">
+                                  <select value={player.size} onChange={(e) => handleRosterChange(index, 'size', e.target.value)} className="w-full bg-white text-gray-900 border-2 border-gray-100 rounded-2xl px-4 py-3 font-bold focus:border-indigo-500 outline-none cursor-pointer">
+                                      {ALL_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
+                                  </select>
+                              </td>
+                              <td className="px-8 py-2">
+                                  <div className="flex flex-col">
+                                    <span className={`text-[9px] font-black px-4 py-2 rounded-full inline-block uppercase tracking-widest ${player.kitType.startsWith('diversos_') ? 'bg-orange-100 text-orange-900' : 'bg-indigo-100 text-indigo-900'}`}>
+                                        {player.productName || KIT_TYPES[player.kitType]}
+                                    </span>
+                                    {!player.kitType.startsWith('diversos_') && (
+                                      <span className="text-[8px] text-gray-400 font-black uppercase mt-1 ml-2">{player.type}</span>
+                                    )}
+                                  </div>
+                              </td>
+                          </tr>
+                      ))}
+                  </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div className="bg-gray-900 text-white rounded-[3rem] p-10 space-y-8 shadow-2xl relative overflow-hidden border-t-8 border-indigo-600">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div>
+                <span className="text-gray-500 font-black text-[10px] uppercase tracking-[0.3em] mb-2 block">Total do Orçamento</span>
+                <div className="text-6xl font-black text-green-400 tracking-tighter italic">R$ {calculateTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+              </div>
+              <div className="bg-white/5 p-6 rounded-3xl border border-white/10 flex items-start gap-4 transition-all hover:bg-white/10 group">
+                <input type="checkbox" checked={hasReviewed} onChange={(e) => setHasReviewed(e.target.checked)} className="w-8 h-8 mt-0.5 cursor-pointer accent-green-500 border-white/20" id="rev" />
+                <label htmlFor="rev" className="cursor-pointer text-gray-400 text-sm font-bold leading-snug group-hover:text-gray-200">Revisei as quantidades, tamanhos e designs. Estou pronto para enviar o pedido.</label>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <button onClick={handleDownload} disabled={!hasReviewed || !config.customerInfo.customerName} className={`py-6 rounded-3xl font-black flex items-center justify-center gap-4 transition-all active:scale-95 uppercase text-xs tracking-[0.2em] ${hasReviewed && config.customerInfo.customerName ? 'bg-white text-gray-900 hover:bg-gray-100 shadow-xl' : 'bg-gray-800 text-gray-600 opacity-50 cursor-not-allowed'}`}>
+                <Download size={24} /> Baixar PDF
+              </button>
+              <button onClick={handleWhatsAppContact} disabled={!hasReviewed || !config.customerInfo.customerName} className={`py-6 rounded-3xl font-black flex items-center justify-center gap-4 transition-all active:scale-95 uppercase text-xs tracking-[0.2em] ${hasReviewed && config.customerInfo.customerName ? 'bg-green-600 text-white hover:bg-green-500 shadow-xl' : 'bg-gray-800 text-gray-600 opacity-50 cursor-not-allowed'}`}>
+                <MessageCircle size={24} /> Finalizar WhatsApp
               </button>
             </div>
         </div>
-        <div className="flex justify-between pt-4"><button onClick={() => setStep(3)} className="text-gray-500 font-medium flex items-center gap-2"><ArrowLeft size={20} /> Voltar</button><button onClick={saveProgress} className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 ${saveStatus==='saved'?'bg-green-500 text-white':'bg-gray-100'}`}><Save size={16} /> {saveStatus==='saving'?'Salvando...':saveStatus==='saved'?'Salvo!':'Salvar Rascunho'}</button></div>
+
+        <div className="flex justify-between items-center pt-4">
+          <button onClick={() => setStep(3)} className="text-gray-400 font-black flex items-center gap-2 uppercase text-xs tracking-widest"><ArrowLeft size={20} /> Voltar</button>
+          <button onClick={saveProgress} className={`px-8 py-4 rounded-2xl font-black flex items-center gap-3 shadow-md transition-all uppercase text-[10px] tracking-widest ${saveStatus==='saved'?'bg-green-500 text-white':'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+            <Save size={18} /> {saveStatus==='saving'?'Salvando...':saveStatus==='saved'?'Salvo!':'Salvar Rascunho'}
+          </button>
+        </div>
     </div>
   );
 
-  if (isLoading) return (<div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div></div>);
+  if (isLoading) return (<div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 space-y-4 font-black"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div><span className="text-gray-400 uppercase text-xs tracking-widest">D'sportivo Uniformes</span></div>);
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans text-gray-900 selection:bg-indigo-100 relative">
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50"><div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between"><BrandLogo /></div></header>
-      <main className="max-w-4xl mx-auto px-4 py-8">
-        <div className="flex justify-center mb-12"><div className="flex items-center gap-4">{[1, 2, 3, 4].map((s) => (<div key={s} className="flex items-center"><div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${step >= s ? 'bg-gray-900 text-white' : 'bg-gray-200 text-gray-500'}`}>{s}</div>{s < 4 && <div className={`w-12 h-1 mx-2 rounded-full ${step > s ? 'bg-gray-900' : 'bg-gray-200'}`}></div>}</div>))}</div></div>
-        <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-6 md:p-10 min-h-[600px] relative">{step === 1 && renderStep1()}{step === 2 && renderStep2()}{step === 3 && renderStep3()}{step === 4 && renderStep4()}</div>
+    <div className="min-h-screen bg-gray-50 font-sans text-gray-900 selection:bg-indigo-100 relative pb-20">
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm"><div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between"><BrandLogo /></div></header>
+      <main className="max-w-5xl mx-auto px-4 py-12">
+        <div className="flex justify-center mb-16"><div className="flex items-center gap-4">{[1, 2, 3, 4].map((s) => (<div key={s} className="flex items-center"><div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-sm font-black transition-all shadow-sm ${step >= s ? 'bg-gray-900 text-white scale-110 rotate-3' : 'bg-white text-gray-300 border border-gray-100'}`}>{s}</div>{s < 4 && <div className={`w-16 h-1 mx-2 rounded-full transition-all ${step > s ? 'bg-gray-900' : 'bg-gray-200'}`}></div>}</div>))}</div></div>
+        <div className="bg-white rounded-[3.5rem] shadow-xl border border-gray-100 p-8 md:p-16 min-h-[600px] relative transition-all overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-50 rounded-full blur-[100px] -mr-32 -mt-32 opacity-50"></div>
+          {step === 1 && renderStep1()}
+          {step === 2 && renderStep2()}
+          {step === 3 && renderStep3()}
+          {step === 4 && renderStep4()}
+        </div>
       </main>
-      {step === 4 && (<button onClick={() => setShowSizeChart(true)} className="fixed bottom-6 right-6 z-40 bg-indigo-600 text-white p-4 rounded-full shadow-lg border-4 border-indigo-100"><Ruler size={24} /></button>)}
+      <button onClick={() => setShowSizeChart(true)} className="fixed bottom-8 right-8 z-40 bg-indigo-600 text-white p-5 rounded-2xl shadow-2xl border-4 border-white hover:bg-indigo-700 transition-all active:scale-90 animate-bounce"><Ruler size={24} /></button>
       {showSizeChart && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowSizeChart(false)}>
-            <div className="bg-white p-2 rounded-xl max-w-5xl w-full relative shadow-2xl flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
-                <div className="flex justify-between items-center p-4 border-b">
-                    <h3 className="text-xl font-bold flex items-center gap-2"><Ruler className="text-indigo-600"/> TABELA DE MEDIDAS</h3>
-                    <button onClick={() => setShowSizeChart(false)}><X size={24} /></button>
+        <div className="fixed inset-0 z-50 bg-gray-900/80 backdrop-blur-md flex items-center justify-center p-4" onClick={() => setShowSizeChart(false)}>
+            <div className="bg-white p-2 rounded-[2.5rem] max-w-6xl w-full relative shadow-2xl flex flex-col max-h-[90vh] animate-in slide-in-from-bottom-10 duration-200" onClick={e => e.stopPropagation()}>
+                <div className="flex justify-between items-center p-8 border-b">
+                    <h3 className="text-2xl font-black flex items-center gap-3 text-gray-900 uppercase tracking-tighter italic"><Ruler className="text-indigo-600" size={28}/> Grade de Tamanhos Profissional</h3>
+                    <button onClick={() => setShowSizeChart(false)} className="p-3 hover:bg-gray-100 rounded-2xl transition-colors"><X size={24} /></button>
                 </div>
-                <div className="overflow-y-auto p-6 bg-gray-50">
-                    <div className="flex justify-center gap-4 mb-8">
-                        <button onClick={() => setActiveSizeTab('standard')} className={`px-6 py-3 rounded-lg font-bold text-sm ${activeSizeTab === 'standard' ? 'bg-blue-600 text-white' : 'bg-white text-gray-500 border'}`}>PADRÃO</button>
-                        <button onClick={() => setActiveSizeTab('diamond')} className={`px-6 py-3 rounded-lg font-bold text-sm ${activeSizeTab === 'diamond' ? 'bg-indigo-900 text-white' : 'bg-white text-gray-500 border'}`}>DIAMANTE (SLIM)</button>
+                <div className="overflow-y-auto p-8 bg-gray-50/50 rounded-b-[2.5rem]">
+                    <div className="flex justify-center gap-4 mb-10">
+                        <button onClick={() => setActiveSizeTab('standard')} className={`px-8 py-4 rounded-2xl font-black text-xs tracking-widest shadow-sm transition-all uppercase ${activeSizeTab === 'standard' ? 'bg-blue-600 text-white scale-105' : 'bg-white text-gray-500 border hover:bg-gray-50'}`}>Modelagem Padrão</button>
+                        <button onClick={() => setActiveSizeTab('diamond')} className={`px-8 py-4 rounded-2xl font-black text-xs tracking-widest shadow-sm transition-all uppercase ${activeSizeTab === 'diamond' ? 'bg-indigo-900 text-white scale-105' : 'bg-white text-gray-500 border hover:bg-gray-50'}`}>Modelagem Slim (Diamante)</button>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
                         <SizeTable title={SIZE_TABLES[activeSizeTab].masculina.title} headerColor={SIZE_TABLES[activeSizeTab].masculina.headerColor} headers={SIZE_TABLES[activeSizeTab].masculina.headers} keys={SIZE_TABLES[activeSizeTab].masculina.keys} data={SIZE_TABLES[activeSizeTab].masculina.data} />
                         <SizeTable title={SIZE_TABLES[activeSizeTab].feminina.title} headerColor={SIZE_TABLES[activeSizeTab].feminina.headerColor} headers={SIZE_TABLES[activeSizeTab].feminina.headers} keys={SIZE_TABLES[activeSizeTab].feminina.keys} data={SIZE_TABLES[activeSizeTab].feminina.data} />
                         <SizeTable title={SIZE_TABLES[activeSizeTab].infantil.title} headerColor={SIZE_TABLES[activeSizeTab].infantil.headerColor} headers={SIZE_TABLES[activeSizeTab].infantil.headers} keys={SIZE_TABLES[activeSizeTab].infantil.keys} data={SIZE_TABLES[activeSizeTab].infantil.data} />
