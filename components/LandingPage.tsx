@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Upload, 
@@ -23,13 +22,14 @@ import {
   Box,
   ShoppingCart,
   Sparkles,
-  Loader2
+  Loader2,
+  Dribbble,
+  Monitor,
+  Hash,
+  User
 } from 'lucide-react';
 
-// Integração Google Gemini API
-import { GoogleGenAI } from "@google/genai";
-
-// Fix: Import Firebase functions directly to avoid destructuring errors from namespace imports
+// Firebase imports diretos
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, Firestore } from 'firebase/firestore';
@@ -45,25 +45,24 @@ const PRICES = {
   equador: { camisa: 44.90, calcao: 35.00, conjunto: 79.90 },
   vanilha: { camisa: 74.90, calcao: 49.90, conjunto: 124.80 },
   corporativa: { camisa: 49.90, calcao: 35.00, conjunto: 84.90 },
+  basquete: { camisa: 55.00, calcao: 45.00, conjunto: 95.00 },
 };
 
 const EMBROIDERY_PRICE = 5.00;
 
 const ADICIONAIS_PRICES: Record<string, number> = {
   colete: 25.00,
-  basquete: 55.00,
   jaqueta: 98.00,
   calca: 75.00,
   regata: 39.90
 };
 
-// Nomes simplificados conforme solicitado pelo usuário
+// Labels simplificadas para Diversos
 const ADICIONAIS_LABELS: Record<string, string> = {
   colete: 'Colete',
-  basquete: 'Basquete',
   jaqueta: 'Jaqueta',
-  calca: 'Calça',
-  regata: 'Regata'
+  calca: 'Calça Tactel',
+  regata: 'Regata Dry'
 };
 
 const SOCK_COLORS = [
@@ -171,6 +170,14 @@ const LINE_DETAILS = {
     color: 'bg-cyan-500',
     icon: Gem
   },
+  basquete: { 
+    name: 'Linha Basquete', 
+    desc: 'Modelagem exclusiva para basquete com tecidos Aero.', 
+    fullDesc: 'Desenvolvida especificamente para atletas de basquete. Corte regata tradicional e bermudas leves.',
+    features: ['Corte Regata', 'Tecido Aero Mesh', 'Alta Performance', 'Design Customizado'],
+    color: 'bg-orange-500',
+    icon: Dribbble
+  },
   corporativa: { 
     name: 'Linha Corporativa', 
     desc: 'Solução ideal para uniformização de equipes e eventos.', 
@@ -181,24 +188,25 @@ const LINE_DETAILS = {
   },
   adicionais: {
     name: 'Diversos / Adicionais',
-    desc: 'Coletes, jaquetas, calças e regatas avulsas.',
+    desc: 'Coletes, jaquetas, calças e regatas dry avulsas.',
     fullDesc: 'Produtos complementares para treinos, viagens e comissão técnica.',
     features: ['Qualidade Esportiva', 'Personalizado', 'Diversas Cores', 'Durabilidade'],
-    color: 'bg-orange-500',
+    color: 'bg-blue-800',
     icon: Layers
   }
 };
 
+// Categorias atualizadas conforme pedido pelo usuário
 const KIT_TYPES: Record<string, string> = {
-  atleta: 'Atleta / Jogador',
+  linha: 'Linha',
   goleiro: 'Goleiro',
-  comissao: 'Comissão Técnica',
+  atleta: 'Atleta',
   torcida: 'Torcida',
-  staff: 'Staff / Eventos'
+  comissao: 'Comissão técnica'
 };
 
 const PRODUCT_LABELS: Record<string, string> = {
-  conjunto: 'Conjunto (Kit Completo)',
+  conjunto: 'Só Conjunto',
   camisa: 'Só Camisa',
   calcao: 'Só Calção'
 };
@@ -234,7 +242,7 @@ interface Config {
 }
 
 const INITIAL_CONFIG: Config = {
-    items: [{ id: 1, line: 'monaco', category: 'atleta', productKey: 'conjunto', quantity: 10, hasEmbroidery: false }],
+    items: [{ id: 1, line: 'monaco', category: 'linha', productKey: 'conjunto', quantity: 10, hasEmbroidery: false }],
     socks: [],
     nextItemId: 2,
     nextSockId: 1,
@@ -292,12 +300,7 @@ export default function LandingPage() {
   const [hasReviewed, setHasReviewed] = useState(false);
   const [designFiles, setDesignFiles] = useState<Record<string, string | null>>({});
 
-  const [aiPrompt, setAiPrompt] = useState('');
-  const [isAiGenerating, setIsAiGenerating] = useState(false);
-  const [aiError, setAiError] = useState<string | null>(null);
-
   useEffect(() => {
-    // Fix: Use window object to check for global variable to avoid build-time "not found" error
     const firebaseConfigGlobal = (window as any).__firebase_config;
     const firebaseConfigStr = typeof firebaseConfigGlobal !== 'undefined' ? String(firebaseConfigGlobal) : '{}';
     let firebaseConfig = {};
@@ -330,7 +333,6 @@ export default function LandingPage() {
   }, []);
 
   const loadProgress = async (dbInstance: Firestore, uid: string) => {
-    // Fix: Access __app_id safely from window object to avoid build-time errors
     const appIdGlobal = (window as any).__app_id;
     const appId = typeof appIdGlobal !== 'undefined' ? String(appIdGlobal) : 'default-app-id';
     try {
@@ -345,7 +347,6 @@ export default function LandingPage() {
   };
 
   const saveProgress = async () => {
-    // Fix: Access __app_id safely from window object
     const appIdGlobal = (window as any).__app_id;
     const appId = typeof appIdGlobal !== 'undefined' ? String(appIdGlobal) : 'default-app-id';
     if (!db || !userId) return;
@@ -383,7 +384,7 @@ export default function LandingPage() {
   const addNewItemRow = () => {
     setConfig(prev => ({
       ...prev,
-      items: [...prev.items, { id: prev.nextItemId, line: 'monaco', category: 'atleta', productKey: 'conjunto', quantity: 1, hasEmbroidery: false }],
+      items: [...prev.items, { id: prev.nextItemId, line: 'monaco', category: 'linha', productKey: 'conjunto', quantity: 1, hasEmbroidery: false }],
       nextItemId: prev.nextItemId + 1
     }));
   };
@@ -411,6 +412,21 @@ export default function LandingPage() {
 
   const removeItemRow = (id: number) => {
     setConfig(prev => ({ ...prev, items: prev.items.filter(item => item.id !== id) }));
+  };
+
+  // Propagar a escolha da linha do Passo 1
+  const selectInitialLine = (line: LineType) => {
+    setConfig(prev => ({
+      ...prev,
+      items: prev.items.map((item, idx) => idx === 0 ? { 
+        ...item, 
+        line: line,
+        productKey: line === 'adicionais' ? 'colete' : 'conjunto',
+        hasEmbroidery: (line === 'equador' || line === 'vanilha')
+      } : item)
+    }));
+    setStep(2);
+    setModalOpen(null);
   };
 
   useEffect(() => {
@@ -466,41 +482,6 @@ export default function LandingPage() {
     }
   };
 
-  const handleAiGenerate = async () => {
-    if (!aiPrompt) return;
-    setIsAiGenerating(true);
-    setAiError(null);
-    try {
-        // Fix: Use the correct initialization and model for image generation
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash-image',
-            contents: { 
-                parts: [{ text: `A professional sports jersey design mockup for a ${config.items[0]?.category || 'soccer'} team. Style concept: ${aiPrompt}. Show front and back on a neutral clean background. Realistic fabric texture.` }] 
-            },
-            config: { 
-                imageConfig: { aspectRatio: "1:1" } 
-            }
-        });
-
-        // Fix: Iterate parts to extract image data correctly from response
-        if (response.candidates?.[0]?.content?.parts) {
-          for (const part of response.candidates[0].content.parts) {
-              if (part.inlineData) {
-                  const base64 = part.inlineData.data;
-                  setDesignFiles(prev => ({ ...prev, ai_generated: `data:image/png;base64,${base64}` }));
-                  break;
-              }
-          }
-        }
-    } catch (err: any) {
-        setAiError("Ocorreu um erro ao gerar o design. Tente uma descrição diferente.");
-        console.error("Gemini Image Gen Error:", err);
-    } finally {
-        setIsAiGenerating(false);
-    }
-  };
-
   const handleDownload = () => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -532,38 +513,48 @@ export default function LandingPage() {
   const renderStep1 = () => (
     <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="text-center space-y-4 pt-4">
-        <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 tracking-tight">Qualidade <span className="text-indigo-600">D'sportivo</span></h1>
-        <p className="text-lg text-gray-600 max-w-2xl mx-auto leading-relaxed">Conheça nossas linhas profissionais de uniformes e acessórios esportivos.</p>
+        <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 tracking-tight italic">Excelência em <span className="text-indigo-600">Uniformes</span></h1>
+        <p className="text-lg text-gray-600 max-w-2xl mx-auto leading-relaxed">Selecione a linha que melhor atende às necessidades do seu time.</p>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 px-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 px-2">
         {(Object.keys(LINE_DETAILS) as Array<LineType>).map((key) => (
-          <div key={key} className="bg-white border border-gray-200 rounded-2xl overflow-hidden hover:shadow-xl transition-all p-6 flex flex-col group">
+          <div key={key} className="bg-white border border-gray-200 rounded-[2rem] overflow-hidden hover:shadow-xl transition-all p-6 flex flex-col group relative">
               <div className="flex items-center gap-4 mb-4">
-                  <div className={`w-12 h-12 rounded-full ${LINE_DETAILS[key].color} text-white flex items-center justify-center shadow-md transition-transform group-hover:rotate-6`}>
-                    {React.createElement(LINE_DETAILS[key].icon, { size: 24 })}
+                  <div className={`w-14 h-14 rounded-2xl ${LINE_DETAILS[key].color} text-white flex items-center justify-center shadow-lg transition-transform group-hover:rotate-6`}>
+                    {React.createElement(LINE_DETAILS[key].icon, { size: 28 })}
                   </div>
-                  <div><h3 className="text-xl font-bold text-gray-900">{LINE_DETAILS[key].name}</h3></div>
+                  <div><h3 className="text-xl font-black text-gray-900 tracking-tighter uppercase italic">{LINE_DETAILS[key].name}</h3></div>
               </div>
-              <p className="text-gray-600 text-sm mb-6 flex-1">{LINE_DETAILS[key].desc}</p>
-              <button onClick={() => setModalOpen(key)} className="w-full py-3 rounded-xl bg-gray-50 text-gray-700 font-bold border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 transition-colors flex items-center justify-center gap-2"><Info size={18} /> Ver Detalhes</button>
+              <p className="text-gray-600 text-sm mb-6 flex-1 font-medium">{LINE_DETAILS[key].desc}</p>
+              <button onClick={() => setModalOpen(key)} className="w-full py-4 rounded-2xl bg-gray-50 text-gray-700 font-black border border-gray-200 hover:bg-indigo-600 hover:text-white transition-all flex items-center justify-center gap-2 uppercase text-xs tracking-widest shadow-sm">
+                <Info size={16} /> Ver Detalhes
+              </button>
           </div>
         ))}
       </div>
       <div className="flex justify-center pt-8 pb-4">
-        <button onClick={() => setStep(2)} className="px-10 py-5 rounded-2xl font-black text-lg flex items-center gap-3 bg-gray-900 text-white hover:bg-indigo-600 shadow-xl transition-transform active:scale-95 uppercase tracking-wider">INICIAR SIMULAÇÃO <ArrowRight size={24} /></button>
+        <button onClick={() => setStep(2)} className="px-12 py-6 rounded-[2.5rem] font-black text-lg flex items-center gap-4 bg-gray-900 text-white hover:bg-indigo-600 shadow-2xl transition-all active:scale-95 uppercase tracking-widest">
+            INICIAR CONFIGURAÇÃO <ArrowRight size={24} />
+        </button>
       </div>
       {modalOpen && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={() => setModalOpen(null)}>
-              <div className="bg-white max-w-lg w-full rounded-2xl p-8 shadow-2xl animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
-                  <div className="flex justify-between items-start mb-6">
-                      <h3 className="text-3xl font-bold">{LINE_DETAILS[modalOpen].name}</h3>
-                      <button onClick={() => setModalOpen(null)} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><X size={24} /></button>
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={() => setModalOpen(null)}>
+              <div className="bg-white max-w-lg w-full rounded-[3rem] p-10 shadow-2xl animate-in zoom-in-95 duration-200 relative overflow-hidden" onClick={e => e.stopPropagation()}>
+                  <div className={`absolute top-0 left-0 right-0 h-2 ${LINE_DETAILS[modalOpen].color}`}></div>
+                  <div className="flex justify-between items-start mb-8">
+                      <div>
+                        <h3 className="text-4xl font-black text-gray-900 tracking-tighter uppercase italic">{LINE_DETAILS[modalOpen].name}</h3>
+                        <p className="text-indigo-600 font-bold uppercase tracking-[0.2em] text-[10px] mt-2">D'sportivo Profissional</p>
+                      </div>
+                      <button onClick={() => setModalOpen(null)} className="p-3 hover:bg-gray-100 rounded-full transition-colors text-gray-400"><X size={28} /></button>
                   </div>
-                  <p className="text-gray-600 mb-6 leading-relaxed">{LINE_DETAILS[modalOpen].fullDesc}</p>
-                  <ul className="space-y-3 mb-8">
-                      {LINE_DETAILS[modalOpen].features.map((f, i) => (<li key={i} className="flex items-center gap-2 font-medium text-gray-700"><Check size={18} className="text-green-500" /> {f}</li>))}
+                  <p className="text-gray-600 mb-8 leading-relaxed font-medium">{LINE_DETAILS[modalOpen].fullDesc}</p>
+                  <ul className="space-y-4 mb-10">
+                      {LINE_DETAILS[modalOpen].features.map((f, i) => (<li key={i} className="flex items-center gap-3 font-black text-gray-700 uppercase text-xs tracking-wide"><Check size={20} className="text-green-500 shrink-0" /> {f}</li>))}
                   </ul>
-                  <button onClick={() => { setStep(2); setModalOpen(null); }} className="w-full py-4 bg-indigo-600 text-white font-bold rounded-xl shadow-lg hover:bg-indigo-700 transition-colors">Escolher {LINE_DETAILS[modalOpen].name}</button>
+                  <button onClick={() => selectInitialLine(modalOpen)} className="w-full py-6 bg-gray-900 text-white font-black rounded-3xl shadow-xl hover:bg-indigo-600 transition-all uppercase tracking-widest text-sm">
+                    ESCOLHER ESTA LINHA
+                  </button>
               </div>
           </div>
       )}
@@ -662,7 +653,7 @@ export default function LandingPage() {
       </div>
 
       <div className="bg-white rounded-[2.5rem] p-8 border border-gray-200 space-y-6 shadow-sm">
-          <h3 className="text-xl font-black text-gray-700 flex items-center gap-3 uppercase tracking-widest">
+          <h3 className="text-xl font-black text-gray-700 flex items-center gap-3 uppercase tracking-widest italic">
             <Footprints size={24} className="text-indigo-600" /> Meiões Profissionais (R$ 20,00)
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -702,53 +693,31 @@ export default function LandingPage() {
 
   const renderStep3 = () => (
     <div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-500">
-      <div className="text-center"><h2 className="text-3xl font-black text-gray-900 uppercase tracking-tighter italic">Referências Visuais</h2><p className="text-sm text-gray-500 font-medium">Anexe artes ou crie novas referências com nossa IA.</p></div>
+      <div className="text-center"><h2 className="text-3xl font-black text-gray-900 uppercase tracking-tighter italic">Referências Visuais</h2><p className="text-sm text-gray-500 font-medium">Use nosso simulador para criar sua arte e anexe o design abaixo.</p></div>
       
-      <div className="bg-indigo-50 border-2 border-dashed border-indigo-200 rounded-[3rem] p-8 space-y-6 shadow-sm">
-        <div className="flex items-center gap-4">
-          <div className="p-3 bg-indigo-600 rounded-2xl text-white shadow-lg">
-            <Sparkles size={28} />
-          </div>
-          <div>
-            <h3 className="text-xl font-black text-indigo-900 uppercase italic tracking-tighter leading-none">IA Designer D'sportivo</h3>
-            <p className="text-xs text-indigo-600 font-bold uppercase tracking-widest mt-1">Crie seu conceito visual instantaneamente</p>
-          </div>
-        </div>
-
-        <div className="flex flex-col md:flex-row gap-4">
-          <input 
-            type="text" 
-            placeholder="Ex: Camisa de futebol degrade azul e preto, gola V, detalhes em dourado..." 
-            value={aiPrompt}
-            onChange={(e) => setAiPrompt(e.target.value)}
-            className="flex-1 px-6 py-4 rounded-2xl border-2 border-indigo-100 focus:border-indigo-500 outline-none font-bold text-gray-700 bg-white shadow-inner"
-          />
-          <button 
-            onClick={handleAiGenerate}
-            disabled={isAiGenerating || !aiPrompt}
-            className={`px-8 py-4 rounded-2xl font-black text-white transition-all flex items-center justify-center gap-3 active:scale-95 ${isAiGenerating ? 'bg-indigo-400' : 'bg-indigo-600 hover:bg-indigo-700 shadow-xl'}`}
-          >
-            {isAiGenerating ? <Loader2 className="animate-spin" size={24} /> : <Sparkles size={24} />}
-            <span className="uppercase tracking-widest text-xs">{isAiGenerating ? 'Gerando...' : 'Gerar Referência'}</span>
-          </button>
+      {/* Seção do Simulador - Substituindo IA */}
+      <div className="bg-indigo-50 border-2 border-dashed border-indigo-200 rounded-[3rem] p-10 space-y-8 shadow-sm flex flex-col items-center text-center">
+        <div className="p-5 bg-indigo-600 rounded-[2rem] text-white shadow-2xl rotate-3 animate-pulse">
+            <Monitor size={48} />
         </div>
         
-        {aiError && <p className="text-red-500 text-xs font-black px-4">{aiError}</p>}
+        <div className="space-y-3 max-w-lg">
+            <h3 className="text-3xl font-black text-indigo-900 uppercase italic tracking-tighter leading-none">Simulador D'sportivo</h3>
+            <p className="text-sm text-indigo-700 font-bold leading-relaxed">
+                Personalize cores, golas, punhos e patrocínios em tempo real. Salve a imagem do seu design e anexe nos campos abaixo para nossa produção.
+            </p>
+        </div>
 
-        {designFiles['ai_generated'] && (
-            <div className="mt-6 animate-in zoom-in-95 duration-300">
-                <div className="relative group rounded-[2.5rem] overflow-hidden border-4 border-white shadow-2xl bg-white">
-                    <img src={designFiles['ai_generated']} className="w-full h-80 object-contain p-4" alt="AI Generated Design" />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4 backdrop-blur-[2px]">
-                        <button onClick={() => setDesignFiles(prev => ({ ...prev, ai_generated: null }))} className="bg-red-500 text-white p-4 rounded-full shadow-lg hover:bg-red-600 transition-colors"><Trash2 size={24}/></button>
-                    </div>
-                    <div className="absolute top-4 right-4 bg-indigo-600 text-white text-[10px] font-black px-4 py-2 rounded-full uppercase tracking-widest shadow-lg">Referência IA</div>
-                </div>
-            </div>
-        )}
+        <a 
+          href="https://www.dsportivo.com.br/simulador/" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="bg-gray-900 text-white px-12 py-6 rounded-[2rem] font-black shadow-2xl hover:bg-indigo-600 transition-all active:scale-95 flex items-center gap-4 uppercase tracking-[0.1em] group"
+        >
+          <ExternalLink size={24} className="group-hover:rotate-12 transition-transform" />
+          ABRIR SIMULADOR
+        </a>
       </div>
-
-      <div className="bg-white p-6 rounded-[2.5rem] flex flex-col md:flex-row justify-between items-center gap-6 border border-gray-100 shadow-sm"><p className="text-gray-600 font-bold text-center md:text-left">Dica: Use nosso simulador 3D para criar seu design antes de anexar:</p><a href="https://www.dsportivo.com.br/simulador/" target="_blank" className="bg-gray-900 text-white px-8 py-4 rounded-2xl font-black flex items-center gap-3 hover:bg-indigo-600 transition-all shadow-lg active:scale-95 uppercase text-[10px] tracking-widest">Acessar Simulador <ExternalLink size={16} /></a></div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {config.items.map((item) => {
@@ -761,9 +730,14 @@ export default function LandingPage() {
               <h3 className="text-xl font-black text-gray-900 uppercase italic tracking-tighter mb-1">{KIT_TYPES[item.category]}</h3>
               <p className="text-[10px] font-black text-gray-400 uppercase mb-4 tracking-widest">{LINE_DETAILS[item.line].name} - {prodLabel}</p>
               {file ? (
-                <div className="w-full h-60 bg-gray-50 rounded-[2rem] overflow-hidden relative z-10 p-4 border border-gray-100"><img src={file} className="w-full h-full object-contain" alt="Preview" /></div>
+                <div className="w-full h-60 bg-gray-50 rounded-[2rem] overflow-hidden relative z-10 p-4 border border-gray-100 flex items-center justify-center">
+                    <img src={file} className="max-w-full max-h-full object-contain rounded-xl" alt="Preview" />
+                    <button onClick={(e) => { e.stopPropagation(); setDesignFiles(prev => ({ ...prev, [key]: null })); }} className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                        <X size={16} />
+                    </button>
+                </div>
               ) : (
-                <div className="flex flex-col items-center py-16 text-gray-400 group-hover:text-indigo-500 transition-colors"><Upload size={48} className="mb-4" /> <span className="text-[10px] font-black uppercase tracking-[0.2em]">Anexar Arte</span></div>
+                <div className="flex flex-col items-center py-16 text-gray-400 group-hover:text-indigo-500 transition-colors"><Upload size={48} className="mb-4" /> <span className="text-[10px] font-black uppercase tracking-[0.2em]">Anexar Design do Simulador</span></div>
               )}
             </div>
           );
@@ -788,36 +762,72 @@ export default function LandingPage() {
             </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-[2.5rem] shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left">
-                  <thead className="bg-gray-50 text-gray-400 text-[10px] font-black uppercase tracking-[0.2em] border-b border-gray-100">
-                    <tr><th className="px-8 py-6">#</th><th className="px-8 py-6">Nome na Peça</th><th className="px-8 py-6">Nº</th><th className="px-8 py-6">Tam</th><th className="px-8 py-6">Item</th></tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                      {roster.map((player, index) => (
-                          <tr key={index} className="hover:bg-gray-50/50 transition-colors">
-                              <td className="px-8 py-4 text-gray-200 font-black italic">{index+1}</td>
-                              <td className="px-8 py-2"><input type="text" value={player.name} onChange={(e) => handleRosterChange(index, 'name', e.target.value)} className="w-full px-5 py-3 bg-white text-gray-900 border-2 border-gray-100 rounded-2xl font-bold focus:border-indigo-500 outline-none shadow-sm" placeholder="Ex: João Silva" /></td>
-                              <td className="px-8 py-2"><input type="text" value={player.number} onChange={(e) => handleRosterChange(index, 'number', e.target.value)} className="w-full text-center px-1 py-3 bg-white text-gray-900 border-2 border-gray-100 rounded-2xl font-bold focus:border-indigo-500 outline-none shadow-sm" placeholder="--" /></td>
-                              <td className="px-8 py-2">
-                                  <select value={player.size} onChange={(e) => handleRosterChange(index, 'size', e.target.value)} className="w-full bg-white text-gray-900 border-2 border-gray-100 rounded-2xl px-4 py-3 font-bold focus:border-indigo-500 outline-none cursor-pointer">
-                                      {ALL_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
-                                  </select>
-                              </td>
-                              <td className="px-8 py-2">
-                                  <span className={`text-[9px] font-black px-4 py-2 rounded-full inline-block uppercase tracking-widest bg-indigo-100 text-indigo-900`}>
-                                      {player.productLabel}
-                                  </span>
-                              </td>
-                          </tr>
-                      ))}
-                  </tbody>
-                </table>
-            </div>
+        {/* Grade de Jogadores Redesenhada para Mobile e Desktop */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {roster.map((player, index) => (
+                <div key={index} className="bg-white border-2 border-gray-100 rounded-[2.5rem] p-6 shadow-sm group hover:border-indigo-200 transition-all flex flex-col gap-4 relative overflow-hidden">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-gray-900 flex items-center justify-center text-white font-black italic shadow-lg shrink-0">#{index + 1}</div>
+                        <div className="h-[2px] flex-1 bg-gray-50"></div>
+                        <span className={`text-[8px] font-black px-3 py-1.5 rounded-full uppercase tracking-tighter bg-indigo-50 text-indigo-900 border border-indigo-100 whitespace-nowrap`}>
+                            {player.productLabel}
+                        </span>
+                    </div>
+
+                    <div className="space-y-4">
+                        {/* Linha 1: Nome e Número */}
+                        <div className="flex gap-4">
+                            <div className="flex-[3]">
+                                <label className="text-[10px] font-black text-gray-400 uppercase ml-1 mb-1.5 block tracking-widest">Nome na Peça</label>
+                                <div className="relative">
+                                    <User size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
+                                    <input 
+                                        type="text" 
+                                        value={player.name} 
+                                        onChange={(e) => handleRosterChange(index, 'name', e.target.value)} 
+                                        className="w-full pl-10 pr-4 py-4 bg-gray-50 text-gray-900 border-2 border-transparent rounded-2xl font-bold focus:bg-white focus:border-indigo-500 outline-none transition-all text-sm" 
+                                        placeholder="Ex: João Silva" 
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex-1">
+                                <label className="text-[10px] font-black text-gray-400 uppercase ml-1 mb-1.5 block tracking-widest text-center">Nº</label>
+                                <div className="relative">
+                                    <Hash size={14} className="absolute left-1/2 -translate-x-[200%] top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none hidden" />
+                                    <input 
+                                        type="text" 
+                                        value={player.number} 
+                                        onChange={(e) => handleRosterChange(index, 'number', e.target.value)} 
+                                        className="w-full text-center py-4 bg-gray-50 text-gray-900 border-2 border-transparent rounded-2xl font-bold focus:bg-white focus:border-indigo-500 outline-none transition-all text-sm" 
+                                        placeholder="--" 
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Linha 2: Tamanho */}
+                        <div>
+                            <label className="text-[10px] font-black text-gray-400 uppercase ml-1 mb-1.5 block tracking-widest">Tamanho</label>
+                            <div className="relative">
+                                <Ruler size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
+                                <select 
+                                    value={player.size} 
+                                    onChange={(e) => handleRosterChange(index, 'size', e.target.value)} 
+                                    className="w-full pl-10 pr-4 py-4 bg-gray-50 text-gray-900 border-2 border-transparent rounded-2xl font-bold focus:bg-white focus:border-indigo-500 outline-none transition-all appearance-none cursor-pointer text-sm"
+                                >
+                                    {ALL_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
+                                </select>
+                                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                                    <ArrowRight size={14} className="rotate-90" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            ))}
         </div>
 
-        <div className="bg-gray-900 text-white rounded-[3rem] p-10 space-y-8 shadow-2xl relative overflow-hidden border-t-8 border-indigo-600">
+        <div className="bg-gray-900 text-white rounded-[3rem] p-10 space-y-8 shadow-2xl relative overflow-hidden border-t-8 border-indigo-600 mt-10">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
               <div>
                 <span className="text-gray-500 font-black text-[10px] uppercase tracking-[0.3em] mb-2 block">Total Estimado</span>
