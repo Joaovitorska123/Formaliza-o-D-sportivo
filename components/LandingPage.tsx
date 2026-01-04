@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Upload, 
@@ -38,26 +39,8 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 const WHATSAPP_NUMBER = "5516991679072"; 
-const WHATSAPP_MESSAGE = "Olá! Acabei de gerar meu orçamento no simulador D'sportivo uniformes e estou entrando em contato para enviar o PDF e finalizar meu pedido.";
+const WHATSAPP_MESSAGE = "Olá! Acabei de gerar minha lista de uniformes no simulador D'sportivo e gostaria de solicitar um orçamento para o meu pedido.";
 
-const PRICES = {
-  monaco: { camisa: 42.90, calcao: 32.00, conjunto: 74.90 },
-  equador: { camisa: 44.90, calcao: 35.00, conjunto: 79.90 },
-  vanilha: { camisa: 74.90, calcao: 49.90, conjunto: 124.80 },
-  corporativa: { camisa: 49.90, calcao: 35.00, conjunto: 84.90 },
-  basquete: { camisa: 55.00, calcao: 45.00, conjunto: 95.00 },
-};
-
-const EMBROIDERY_PRICE = 5.00;
-
-const ADICIONAIS_PRICES: Record<string, number> = {
-  colete: 25.00,
-  jaqueta: 98.00,
-  calca: 75.00,
-  regata: 39.90
-};
-
-// Labels simplificadas para Diversos
 const ADICIONAIS_LABELS: Record<string, string> = {
   colete: 'Colete',
   jaqueta: 'Jaqueta',
@@ -150,7 +133,7 @@ const LINE_DETAILS = {
     name: 'Linha Mônaco', 
     desc: 'Excelente custo-benefício. Ideal para quem busca economia.', 
     fullDesc: 'A Linha Mônaco é focada em times amadores e interclasses. Tecido Dry Leve com proteção UV básica.',
-    features: ['Tecido Dry Leve', 'Modelagem Padrão', 'Bordado Opcional (+R$ 5)', 'Proteção UV Básica'],
+    features: ['Tecido Dry Leve', 'Modelagem Padrão', 'Bordado Opcional', 'Proteção UV Básica'],
     color: 'bg-gray-400',
     icon: Trophy
   },
@@ -182,7 +165,7 @@ const LINE_DETAILS = {
     name: 'Linha Corporativa', 
     desc: 'Solução ideal para uniformização de equipes e eventos.', 
     fullDesc: 'Desenvolvida para empresas e eventos corporativos. Focada em praticidade e durabilidade.',
-    features: ['Unissex Versátil', 'Tecido Antipilling', 'Fácil Lavagem', 'Sem Bordado'],
+    features: ['Unissex Versátil', 'Tecido Antipilling', 'Fácil Lavagem', 'Design Sob Medida'],
     color: 'bg-slate-800',
     icon: Briefcase
   },
@@ -196,7 +179,6 @@ const LINE_DETAILS = {
   }
 };
 
-// Categorias atualizadas conforme pedido pelo usuário
 const KIT_TYPES: Record<string, string> = {
   linha: 'Linha',
   goleiro: 'Goleiro',
@@ -363,24 +345,6 @@ export default function LandingPage() {
   const totalItemsCount = useMemo(() => config.items.reduce((sum, item) => sum + item.quantity, 0), [config.items]);
   const minOrderMet = totalItemsCount >= 10;
   
-  const calculateTotal = () => {
-    const itemsTotal = config.items.reduce((acc, item) => {
-      let unitPrice = 0;
-      if (item.line === 'adicionais') {
-        unitPrice = ADICIONAIS_PRICES[item.productKey] || 0;
-      } else {
-        const linePrices = (PRICES as any)[item.line];
-        unitPrice = linePrices[item.productKey] || 0;
-        if (item.line === 'monaco' && item.hasEmbroidery && item.productKey !== 'calcao') {
-          unitPrice += EMBROIDERY_PRICE;
-        }
-      }
-      return acc + (unitPrice * item.quantity);
-    }, 0);
-    const socksTotal = config.socks.reduce((sum, sock) => sum + sock.quantity, 0) * 20.00; 
-    return itemsTotal + socksTotal;
-  };
-
   const addNewItemRow = () => {
     setConfig(prev => ({
       ...prev,
@@ -414,7 +378,6 @@ export default function LandingPage() {
     setConfig(prev => ({ ...prev, items: prev.items.filter(item => item.id !== id) }));
   };
 
-  // Propagar a escolha da linha do Passo 1
   const selectInitialLine = (line: LineType) => {
     setConfig(prev => ({
       ...prev,
@@ -496,13 +459,12 @@ export default function LandingPage() {
       tableBody.push([
         KIT_TYPES[item.category],
         `${LINE_DETAILS[item.line].name} (${prodLabel})`,
-        `${item.quantity} un`,
-        `R$ ${calculateTotal().toLocaleString('pt-BR')}`
+        `${item.quantity} un`
       ]);
     });
 
-    autoTable(doc, { startY: 35, head: [['Categoria', 'Linha / Produto', 'Quantidade', 'Total']], body: tableBody });
-    doc.save(`Orcamento_Dsportivo.pdf`);
+    autoTable(doc, { startY: 35, head: [['Categoria', 'Linha / Produto', 'Quantidade']], body: tableBody });
+    doc.save(`Pedido_Dsportivo.pdf`);
   };
 
   const handleWhatsAppContact = () => {
@@ -570,17 +532,6 @@ export default function LandingPage() {
 
       <div className="space-y-6">
         {config.items.map((item) => {
-          let unitPrice = 0;
-          if (item.line === 'adicionais') {
-            unitPrice = ADICIONAIS_PRICES[item.productKey] || 0;
-          } else {
-            const linePrices = (PRICES as any)[item.line];
-            unitPrice = linePrices[item.productKey] || 0;
-            if (item.line === 'monaco' && item.hasEmbroidery && item.productKey !== 'calcao') {
-              unitPrice += EMBROIDERY_PRICE;
-            }
-          }
-          
           return (
             <div key={item.id} className="bg-white rounded-[2.5rem] p-6 border border-indigo-50 shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
                 <div className={`absolute left-0 top-0 bottom-0 w-2 ${LINE_DETAILS[item.line].color}`}></div>
@@ -620,16 +571,12 @@ export default function LandingPage() {
                     </div>
                 </div>
                 
-                <div className="mt-6 flex flex-wrap items-center justify-between gap-4 pt-6 border-t border-gray-50">
+                <div className="mt-6 flex flex-wrap items-center gap-4 pt-6 border-t border-gray-50">
                     <div className="flex items-center gap-6">
-                        <div className="flex flex-col">
-                            <span className="text-[10px] font-black text-gray-400 uppercase leading-none mb-1">Valor Unitário</span>
-                            <span className="text-lg font-black text-indigo-900">R$ {unitPrice.toFixed(2)}</span>
-                        </div>
                         {item.line === 'monaco' && item.productKey !== 'calcao' && (
                             <div className="flex items-center gap-2 bg-indigo-50 px-4 py-2 rounded-xl border border-indigo-100">
                                 <input type="checkbox" id={`emb-${item.id}`} checked={item.hasEmbroidery} onChange={(e) => updateItemRow(item.id, 'hasEmbroidery', e.target.checked)} className="w-4 h-4 accent-indigo-600 rounded cursor-pointer" />
-                                <label htmlFor={`emb-${item.id}`} className="text-[10px] font-black text-indigo-900 uppercase cursor-pointer">Adicionar Bordado (+R$ 5,00)</label>
+                                <label htmlFor={`emb-${item.id}`} className="text-[10px] font-black text-indigo-900 uppercase cursor-pointer">Adicionar Bordado</label>
                             </div>
                         )}
                         {(item.line === 'equador' || item.line === 'vanilha') && item.productKey !== 'calcao' && (
@@ -638,10 +585,6 @@ export default function LandingPage() {
                                 <span className="text-[10px] font-black text-green-700 uppercase">Bordado Incluso</span>
                             </div>
                         )}
-                    </div>
-                    <div className="text-right">
-                        <span className="text-[10px] font-black text-gray-400 uppercase leading-none mb-1">Subtotal</span>
-                        <div className="text-2xl font-black text-gray-900 tracking-tighter">R$ {(unitPrice * item.quantity).toFixed(2)}</div>
                     </div>
                 </div>
             </div>
@@ -654,7 +597,7 @@ export default function LandingPage() {
 
       <div className="bg-white rounded-[2.5rem] p-8 border border-gray-200 space-y-6 shadow-sm">
           <h3 className="text-xl font-black text-gray-700 flex items-center gap-3 uppercase tracking-widest italic">
-            <Footprints size={24} className="text-indigo-600" /> Meiões Profissionais (R$ 20,00)
+            <Footprints size={24} className="text-indigo-600" /> Meiões Profissionais
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {config.socks.map(sock => (
@@ -695,7 +638,6 @@ export default function LandingPage() {
     <div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-500">
       <div className="text-center"><h2 className="text-3xl font-black text-gray-900 uppercase tracking-tighter italic">Referências Visuais</h2><p className="text-sm text-gray-500 font-medium">Use nosso simulador para criar sua arte e anexe o design abaixo.</p></div>
       
-      {/* Seção do Simulador - Substituindo IA */}
       <div className="bg-indigo-50 border-2 border-dashed border-indigo-200 rounded-[3rem] p-10 space-y-8 shadow-sm flex flex-col items-center text-center">
         <div className="p-5 bg-indigo-600 rounded-[2rem] text-white shadow-2xl rotate-3 animate-pulse">
             <Monitor size={48} />
@@ -751,7 +693,7 @@ export default function LandingPage() {
     <div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-500">
         <div className="text-center space-y-2">
           <h2 className="text-3xl font-black text-gray-900 uppercase tracking-tighter italic">Quase Lá!</h2>
-          <p className="text-sm text-gray-500 font-medium">Preencha sua grade e dados de contato para o orçamento final.</p>
+          <p className="text-sm text-gray-500 font-medium">Preencha sua grade e dados de contato para finalizarmos sua solicitação.</p>
         </div>
         
         <div className="bg-white border-2 border-indigo-100 rounded-[2.5rem] p-8 space-y-6 shadow-sm">
@@ -762,7 +704,6 @@ export default function LandingPage() {
             </div>
         </div>
 
-        {/* Grade de Jogadores Redesenhada para Mobile e Desktop */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {roster.map((player, index) => (
                 <div key={index} className="bg-white border-2 border-gray-100 rounded-[2.5rem] p-6 shadow-sm group hover:border-indigo-200 transition-all flex flex-col gap-4 relative overflow-hidden">
@@ -775,7 +716,6 @@ export default function LandingPage() {
                     </div>
 
                     <div className="space-y-4">
-                        {/* Linha 1: Nome e Número */}
                         <div className="flex gap-4">
                             <div className="flex-[3]">
                                 <label className="text-[10px] font-black text-gray-400 uppercase ml-1 mb-1.5 block tracking-widest">Nome na Peça</label>
@@ -793,7 +733,6 @@ export default function LandingPage() {
                             <div className="flex-1">
                                 <label className="text-[10px] font-black text-gray-400 uppercase ml-1 mb-1.5 block tracking-widest text-center">Nº</label>
                                 <div className="relative">
-                                    <Hash size={14} className="absolute left-1/2 -translate-x-[200%] top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none hidden" />
                                     <input 
                                         type="text" 
                                         value={player.number} 
@@ -805,7 +744,6 @@ export default function LandingPage() {
                             </div>
                         </div>
 
-                        {/* Linha 2: Tamanho */}
                         <div>
                             <label className="text-[10px] font-black text-gray-400 uppercase ml-1 mb-1.5 block tracking-widest">Tamanho</label>
                             <div className="relative">
@@ -829,9 +767,10 @@ export default function LandingPage() {
 
         <div className="bg-gray-900 text-white rounded-[3rem] p-10 space-y-8 shadow-2xl relative overflow-hidden border-t-8 border-indigo-600 mt-10">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-              <div>
-                <span className="text-gray-500 font-black text-[10px] uppercase tracking-[0.3em] mb-2 block">Total Estimado</span>
-                <div className="text-6xl font-black text-green-400 tracking-tighter italic">R$ {calculateTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+              <div className="max-w-md">
+                <span className="text-gray-500 font-black text-[10px] uppercase tracking-[0.3em] mb-2 block">Solicitação de Orçamento</span>
+                <div className="text-4xl font-black text-white tracking-tighter italic">Tudo pronto!</div>
+                <p className="text-gray-400 text-sm mt-2 font-medium">Ao finalizar, você receberá a lista detalhada para enviarmos seu orçamento oficial via WhatsApp.</p>
               </div>
               <div className="bg-white/5 p-6 rounded-3xl border border-white/10 flex items-start gap-4 transition-all hover:bg-white/10 group">
                 <input type="checkbox" checked={hasReviewed} onChange={(e) => setHasReviewed(e.target.checked)} className="w-8 h-8 mt-0.5 cursor-pointer accent-green-500 border-white/20" id="rev" />
@@ -841,10 +780,10 @@ export default function LandingPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <button onClick={handleDownload} disabled={!hasReviewed || !config.customerInfo.customerName} className={`py-6 rounded-3xl font-black flex items-center justify-center gap-4 transition-all active:scale-95 uppercase text-xs tracking-[0.2em] ${hasReviewed && config.customerInfo.customerName ? 'bg-white text-gray-900 hover:bg-gray-100 shadow-xl' : 'bg-gray-800 text-gray-600 opacity-50 cursor-not-allowed'}`}>
-                <Download size={24} /> Gerar PDF do Pedido
+                <Download size={24} /> Baixar Lista do Pedido (PDF)
               </button>
               <button onClick={handleWhatsAppContact} disabled={!hasReviewed || !config.customerInfo.customerName} className={`py-6 rounded-3xl font-black flex items-center justify-center gap-4 transition-all active:scale-95 uppercase text-xs tracking-[0.2em] ${hasReviewed && config.customerInfo.customerName ? 'bg-green-600 text-white hover:bg-green-500 shadow-xl' : 'bg-gray-800 text-gray-600 opacity-50 cursor-not-allowed'}`}>
-                <MessageCircle size={24} /> Chamar no WhatsApp
+                <MessageCircle size={24} /> Solicitar Orçamento no WhatsApp
               </button>
             </div>
         </div>
